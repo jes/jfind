@@ -178,6 +178,10 @@ void indexfs(TreeNode *t, char *path) {
         return;
     }
 
+    /* TODO: find out if there is a race window between opendir and
+     * inotify_add_watch
+     */
+
     int mask = IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO;
 
     /* notice when the root node gets deleted */
@@ -346,7 +350,8 @@ int do_inotify(TreeNode *t) {
         }
         if(ev[i]->mask & IN_MOVED_TO) {
             moved_from = NULL;
-            /* TODO: manipulate the tree, re-index from here */
+            /* TODO: manipulate the tree */
+            /* TODO: do we nede to re-index at this point? */
         } else {
             if(moved_from) {
                 fprintf(stderr, "error: have a moved_from, but didn't get a "
