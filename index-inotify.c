@@ -149,8 +149,8 @@ void free_node(TreeNode *t) {
     for(i = 0; i < t->nchilds; i++) {
         free_node(t->child[i]);
     }
-    /*if(t->is_dir && t->wd != -1)
-        HASH_DEL(node_wd_hash, t);*/
+    if(t->is_dir && t->wd != -1)
+        HASH_DEL(node_wd_hash, t);
     free(t->child);
     free(t->name);
     free(t);
@@ -162,14 +162,6 @@ void indexfs(TreeNode *t, char *path) {
     struct dirent *de;
     struct stat statbuf;
 
-    /* TODO: watch IN_ATTRIB if access control is added */
-    if((t->wd = inotify_add_watch(ifd, path, IN_CREATE | IN_DELETE
-                    | IN_DELETE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) == -1) {
-        fprintf(stderr, "inotify_add_watch(%s): %s\n", path, strerror(errno));
-    } else {
-        HASH_ADD_INT(node_wd_hash, wd, t);
-    }
-
     if(strlen(path) > 16384) {
         fprintf(stderr, "fail: strlen(path) = %ld\n", strlen(path));
         exit(1);
@@ -178,6 +170,14 @@ void indexfs(TreeNode *t, char *path) {
     if(!(dp = opendir(path))) {
         fprintf(stderr, "opendir %s: %s\n", path, strerror(errno));
         return;
+    }
+
+    /* TODO: watch IN_ATTRIB if access control is added */
+    if((t->wd = inotify_add_watch(ifd, path, IN_CREATE | IN_DELETE
+                    | IN_DELETE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) == -1) {
+        fprintf(stderr, "inotify_add_watch(%s): %s\n", path, strerror(errno));
+    } else {
+        HASH_ADD_INT(node_wd_hash, wd, t);
     }
 
     char *endpath = path + strlen(path);
@@ -263,18 +263,33 @@ int do_inotify(TreeNode *t) {
     for(i = 0; i < nevents; i++) {
         TreeNode *t = node_for_wd(ev[i]->wd);
 
-        char *name = strdup("!!!FAIL!!!");
+        char *name = NULL;
         if(t) {
             name = node_name(t);
 
             if(ev[i]->mask & IN_CREATE) {
                 TreeNode *new = new_treenode(ev[i]->name);
-                /* TODO: index_fs() */
-                add_child(t, new);
+                name = realloc(name, strlen(name) + strlen(ev[i]->name) + 2);
+                strcat(name, "/");
+                strcat(name, ev[i]->name);
+                struct stat statbuf;
+                if((lstat(name, &statbuf)) == 0) {
+                    if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
+                        indexfs(new, name);
+                        add_child(t, new);
+                    }
+                } else {
+                    fprintf(stderr, "stat %s: %s\n", name, strerror(errno));
+                }
             }
             if(ev[i]->mask & IN_DELETE_SELF) {
-                remove_node(t);
-                free_node(t);
+                /* Do nothing here because it will be handled by the parent
+                 * node soon enough
+                 */
+                if(strcmp(t->name, "") == 0) {
+                    fprintf(stderr, "error: deleted root! bailing.\n");
+                    exit(1);
+                }
             }
             if(ev[i]->mask & IN_DELETE) {
                 printf("IN_DELETE %s\n", ev[i]->name);
@@ -285,7 +300,8 @@ int do_inotify(TreeNode *t) {
 
         printf("wd %d (%s):\n", ev[i]->wd, name);
 
-        free(name); name=NULL;
+        free(name);
+        name = NULL;
 
         printf("  events: %d = ", ev[i]->mask);
         if(ev[i]->mask & IN_ACCESS)
