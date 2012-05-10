@@ -21,6 +21,7 @@
 
 typedef struct TreeNode {
     char is_dir;
+    int cookie;
     int wd;
     int nchilds;
     struct TreeNode *parent;
@@ -34,6 +35,8 @@ int nresults;
 int ndirs, nfiles;
 int *descr;
 
+char path[PATH_MAX > 32768 ? PATH_MAX : 32768];
+
 TreeNode *node_wd_hash;
 
 TreeNode *new_treenode(const char *name) {
@@ -46,7 +49,7 @@ TreeNode *new_treenode(const char *name) {
     return t;
 }
 
-TreeNode *add_child(TreeNode *t, TreeNode *child) {
+void add_child(TreeNode *t, TreeNode *child) {
     t->child = realloc(t->child, (t->nchilds + 1) * sizeof(TreeNode*));
     t->child[t->nchilds++] = child;
     child->parent = t;
@@ -119,15 +122,18 @@ TreeNode *remove_path(TreeNode *t, char *path) {
 }
 
 char *node_name(TreeNode *t) {
-    char *path = strdup(t->name);
+    char *path = malloc(strlen(t->name) + 2);
+    sprintf(path, "%s%s", t->name, t->is_dir ? "/" : "");
 
     t = t->parent;
 
     while(t) {
-        char *newpath = malloc(strlen(t->name) + strlen(path) + 2);
-        sprintf(newpath, "%s/%s", t->name, path);
-        free(path);
-        path = newpath;
+        if(*t->name) {
+            char *newpath = malloc(strlen(t->name) + strlen(path) + 3);
+            sprintf(newpath, "/%s/%s", t->name, path);
+            free(path);
+            path = newpath;
+        }
         t = t->parent;
     }
 
@@ -172,9 +178,14 @@ void indexfs(TreeNode *t, char *path) {
         return;
     }
 
+    int mask = IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO;
+
+    /* notice when the root node gets deleted */
+    if(t->parent == NULL)
+        mask |= IN_DELETE_SELF;
+
     /* TODO: watch IN_ATTRIB if access control is added */
-    if((t->wd = inotify_add_watch(ifd, path, IN_CREATE | IN_DELETE
-                    | IN_DELETE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) == -1) {
+    if((t->wd = inotify_add_watch(ifd, path, mask)) == -1) {
         fprintf(stderr, "inotify_add_watch(%s): %s\n", path, strerror(errno));
     } else {
         HASH_ADD_INT(node_wd_hash, wd, t);
@@ -182,12 +193,14 @@ void indexfs(TreeNode *t, char *path) {
 
     char *endpath = path + strlen(path);
 
+    strcat(path, "/");
+
     while((de = readdir(dp))) {
         if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
             continue;
 
         /* TODO: security */
-        *endpath = '\0';
+        *(endpath+1) = '\0';
         strcat(path, de->d_name);
 
         TreeNode *child = new_treenode(de->d_name);
@@ -202,7 +215,6 @@ void indexfs(TreeNode *t, char *path) {
 
         if(child->is_dir) {
             /* TODO: security */
-            strcat(path, "/");
             indexfs(child, path);
         }
 
@@ -243,6 +255,7 @@ void search(TreeNode *t, char *path, const char *term) {
 int do_inotify(TreeNode *t) {
     char buf[1024];
     struct inotify_event *ev[1024 / sizeof(struct inotify_event) + 1];
+    static char *moved_from = NULL;
 
     int n;
     if((n = read(ifd, buf, 1024)) <= 0) {
@@ -264,46 +277,12 @@ int do_inotify(TreeNode *t) {
         TreeNode *t = node_for_wd(ev[i]->wd);
 
         char *name = NULL;
-        if(t) {
+        if(t)
             name = node_name(t);
-
-            if(ev[i]->mask & IN_CREATE) {
-                TreeNode *new = new_treenode(ev[i]->name);
-                name = realloc(name, strlen(name) + strlen(ev[i]->name) + 2);
-                strcat(name, "/");
-                strcat(name, ev[i]->name);
-                struct stat statbuf;
-                if((lstat(name, &statbuf)) == 0) {
-                    if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
-                        indexfs(new, name);
-                        add_child(t, new);
-                    }
-                } else {
-                    fprintf(stderr, "stat %s: %s\n", name, strerror(errno));
-                }
-            }
-            if(ev[i]->mask & IN_DELETE_SELF) {
-                /* Do nothing here because it will be handled by the parent
-                 * node soon enough
-                 */
-                if(strcmp(t->name, "") == 0) {
-                    fprintf(stderr, "error: deleted root! bailing.\n");
-                    exit(1);
-                }
-            }
-            if(ev[i]->mask & IN_DELETE) {
-                printf("IN_DELETE %s\n", ev[i]->name);
-                TreeNode *node = remove_path(t, ev[i]->name);
-                free_node(node);
-            }
-        }
 
         printf("wd %d (%s):\n", ev[i]->wd, name);
 
-        free(name);
-        name = NULL;
-
-        printf("  events: %d = ", ev[i]->mask);
+        printf("  events: %08x =", ev[i]->mask);
         if(ev[i]->mask & IN_ACCESS)
             printf(" IN_ACCESS");
         if(ev[i]->mask & IN_MODIFY)
@@ -326,6 +305,10 @@ int do_inotify(TreeNode *t) {
             printf(" IN_CREATE");
         if(ev[i]->mask & IN_DELETE_SELF)
             printf(" IN_DELETE_SELF");
+        if(ev[i]->mask & IN_ISDIR)
+            printf(" IN_ISDIR");
+        if(ev[i]->mask & IN_IGNORED)
+            printf(" IN_IGNORED");
         printf("\n");
 
         printf("  cookie: %d\n", ev[i]->cookie);
@@ -334,6 +317,52 @@ int do_inotify(TreeNode *t) {
             printf("  name: %s\n", ev[i]->name);
         else
             printf("  name: (null)\n");
+
+        if(ev[i]->mask & IN_CREATE) {
+            TreeNode *new = new_treenode(ev[i]->name);
+            char indexfrom[32768];
+            fprintf(stderr, "{%s, %s, %s}\n", path, name, ev[i]->name);
+            sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
+            fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
+            struct stat statbuf;
+            if((lstat(indexfrom, &statbuf)) == 0) {
+                add_child(t, new);
+                if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
+                    new->is_dir = 1;
+                    strcat(indexfrom, "/");
+                    indexfs(new, indexfrom);
+                }
+            } else {
+                fprintf(stderr, "stat %s: %s\n", indexfrom, strerror(errno));
+            }
+        }
+        if(ev[i]->mask & IN_DELETE_SELF) {
+            fprintf(stderr, "error: deleted root node! bailing.\n");
+            exit(1);
+        }
+        if(ev[i]->mask & IN_DELETE) {
+            TreeNode *node = remove_path(t, ev[i]->name);
+            free_node(node);
+        }
+        if(ev[i]->mask & IN_MOVED_TO) {
+            moved_from = NULL;
+            /* TODO: manipulate the tree, re-index from here */
+        } else {
+            if(moved_from) {
+                fprintf(stderr, "error: have a moved_from, but didn't get a "
+                        "moved_to!\n");
+                exit(1);
+            }
+        }
+        if(ev[i]->mask & IN_MOVED_FROM) {
+            if(moved_from) {
+                fprintf(stderr, "error: already have a moved_from!\n");
+                exit(1);
+            }
+            moved_from = strdup(ev[i]->name);
+        }
+
+        free(name);
     }
 
     return 0;
@@ -342,20 +371,19 @@ int do_inotify(TreeNode *t) {
 /* return -1 on error or eof and 0 on success */
 int do_search(TreeNode *t) {
     char buf[1024];
-    /* TODO: correct size for path */
-    char path[32768];
+    char string[32768];
     struct timeval start, stop;
 
     if(fgets(buf, 1024, stdin) == NULL)
         return -1;
     buf[strlen(buf)-1] = '\0';
 
-    *path = '\0';
-
     nresults = 0;
 
+    *string = '\0';
+
     gettimeofday(&start, NULL);
-    search(t, path, buf);
+    search(t, string, buf);
     gettimeofday(&stop, NULL);
 
     double secs = (stop.tv_sec - start.tv_sec)
@@ -377,7 +405,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    char path[PATH_MAX > 32768 ? PATH_MAX : 32768];
     struct timeval start, stop;
 
     if((ifd = inotify_init()) == -1) {
@@ -388,8 +415,8 @@ int main(int argc, char **argv) {
     /* TODO: security */
     strcpy(path, argv[1]);
 
-    if(path[strlen(path)-1] != '/')
-        strcat(path, "/");
+    if(path[strlen(path)-1] == '/')
+        path[strlen(path)-1] = '\0';
 
     TreeNode *t = new_treenode("");
     t->is_dir = 1; /* hopefully! */
