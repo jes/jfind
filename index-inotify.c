@@ -21,6 +21,7 @@
 
 typedef struct TreeNode {
     char is_dir;
+    char indexed;
     int cookie;
     int wd;
     int nchilds;
@@ -133,11 +134,18 @@ char *node_name(TreeNode *t) {
     while(t) {
         if(*t->name) {
             char *newpath = malloc(strlen(t->name) + strlen(path) + 3);
-            sprintf(newpath, "%s%s/%s", (*t->name ? "/" : ""), t->name, path);
+            sprintf(newpath, "%s/%s", t->name, path);
             free(path);
             path = newpath;
         }
         t = t->parent;
+    }
+
+    if(*path != '/') {
+        char *newpath = malloc(strlen(path) + 2);
+        sprintf(newpath, "/%s", path);
+        free(path);
+        path = newpath;
     }
 
     return path;
@@ -217,6 +225,8 @@ void indexfs(TreeNode *t, char *path) {
             fprintf(stderr, "stat %s: %s\n", path, strerror(errno));
             continue;
         }
+
+        t->indexed = 1;
 
         child->is_dir = S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode);
 
@@ -332,8 +342,9 @@ int do_inotify(TreeNode *root) {
             sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
             fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
             struct stat statbuf;
+            add_child(t, new);
             if((lstat(indexfrom, &statbuf)) == 0) {
-                add_child(t, new);
+                t->indexed = 1;
                 if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
                     new->is_dir = 1;
                     strcat(indexfrom, "/");
@@ -360,6 +371,12 @@ int do_inotify(TreeNode *root) {
                 free(moved_node->name);
                 moved_node->name = strdup(ev[i]->name);
                 add_child(t, moved_node);
+                if(!t->indexed) {
+                    char *name = node_name(moved_node);
+                    fprintf(stderr, "warning: %s not indexed; may need to "
+                            "re-index!\n", name);
+                    exit(1);
+                }
                 moved_node = NULL;
                 /* TODO: do we need to re-index at this point? */
             }
@@ -388,7 +405,6 @@ int do_inotify(TreeNode *root) {
 /* return -1 on error or eof and 0 on success */
 int do_search(TreeNode *t) {
     char buf[1024];
-    char string[32768];
     struct timeval start, stop;
 
     if(fgets(buf, 1024, stdin) == NULL)
@@ -397,10 +413,8 @@ int do_search(TreeNode *t) {
 
     nresults = 0;
 
-    *string = '\0';
-
     gettimeofday(&start, NULL);
-    search(t, string, buf);
+    search(t, path, buf);
     gettimeofday(&stop, NULL);
 
     double secs = (stop.tv_sec - start.tv_sec)
