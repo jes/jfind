@@ -17,6 +17,8 @@
  - if any tree operations become compute bound, start sorting t->child and
    binary searching
  - try storing children in a linked list instead of an array
+ - make separate node types for non-directories to make them smaller (e.g.
+   don't need childs, hash handle)
 */
 
 typedef struct TreeNode {
@@ -31,6 +33,12 @@ typedef struct TreeNode {
     UT_hash_handle hh;
 } TreeNode;
 
+typedef struct NodeMove {
+    int cookie;
+    TreeNode *node;
+    UT_hash_handle hh;
+} NodeMove;
+
 int ifd = -1;
 int nresults;
 int ndirs, nfiles;
@@ -39,6 +47,7 @@ int *descr;
 char path[PATH_MAX > 32768 ? PATH_MAX : 32768];
 
 TreeNode *node_wd_hash;
+NodeMove *node_move_hash;
 
 TreeNode *new_treenode(const char *name) {
     TreeNode *t = malloc(sizeof(TreeNode));
@@ -166,6 +175,7 @@ void free_node(TreeNode *t) {
     for(i = 0; i < t->nchilds; i++) {
         free_node(t->child[i]);
     }
+    /* TODO: delete from node_move_hash */
     if(t->is_dir && t->wd != -1)
         HASH_DEL(node_wd_hash, t);
     free(t->child);
@@ -268,11 +278,32 @@ void search(TreeNode *t, char *path, const char *term) {
     *endpath = '\0';
 }
 
+/* set the "from" node for this cookie */
+void node_moved_from(int cookie, TreeNode *t) {
+    NodeMove *m = malloc(sizeof(NodeMove));
+    m->cookie = cookie;
+    m->node = t;
+    HASH_ADD_INT(node_move_hash, cookie, m);
+}
+
+/* return the node that is moved for the given cookie */
+NodeMove *node_for_cookie(int cookie) {
+    NodeMove *m;
+
+    HASH_FIND_INT(node_move_hash, &cookie, m);
+
+    return m;
+}
+
+/* delete the given cookie from the node_move_hash */
+void unhash_nodemove(NodeMove *m) {
+    HASH_DEL(node_move_hash, m);
+}
+
 /* return -1 on error and 0 on success */
 int do_inotify(TreeNode *root) {
     char buf[1024];
     struct inotify_event *ev[1024 / sizeof(struct inotify_event) + 1];
-    static TreeNode *moved_node = NULL;
 
     int n;
     if((n = read(ifd, buf, 1024)) <= 0) {
@@ -344,7 +375,7 @@ int do_inotify(TreeNode *root) {
             struct stat statbuf;
             add_child(t, new);
             if((lstat(indexfrom, &statbuf)) == 0) {
-                t->indexed = 1;
+                new->indexed = 1;
                 if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
                     new->is_dir = 1;
                     strcat(indexfrom, "/");
@@ -363,6 +394,14 @@ int do_inotify(TreeNode *root) {
             free_node(node);
         }
         if(ev[i]->mask & IN_MOVED_TO) {
+            NodeMove *m = node_for_cookie(ev[i]->cookie);
+            if(!m) {
+                fprintf(stderr, "error: got a cookie for which we have no "
+                        "node_move!\n");
+                exit(1);
+            }
+            TreeNode *moved_node = m->node;
+            unhash_nodemove(m);
             if(!moved_node) {
                 fprintf(stderr, "error: got moved_to but no moved_from!\n");
                 exit(1);
@@ -371,28 +410,33 @@ int do_inotify(TreeNode *root) {
                 free(moved_node->name);
                 moved_node->name = strdup(ev[i]->name);
                 add_child(t, moved_node);
-                if(!t->indexed) {
-                    char *name = node_name(moved_node);
-                    fprintf(stderr, "warning: %s not indexed; may need to "
-                            "re-index!\n", name);
-                    exit(1);
+                if(!moved_node->indexed) {
+                    fprintf(stderr, "warning: %s%s not indexed; trying to "
+                            "re-index!\n", name, ev[i]->name);
+
+                    char indexfrom[32768];
+                    fprintf(stderr, "{%s, %s, %s}\n", path, name, ev[i]->name);
+                    sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
+                    fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
+                    struct stat statbuf;
+                    if((lstat(indexfrom, &statbuf)) == 0) {
+                        moved_node->indexed = 1;
+                        if(S_ISDIR(statbuf.st_mode)
+                                && !S_ISLNK(statbuf.st_mode)) {
+                            moved_node->is_dir = 1;
+                            strcat(indexfrom, "/");
+                            indexfs(moved_node, indexfrom);
+                        }
+                    } else {
+                        fprintf(stderr, "stat %s: %s\n", indexfrom,
+                                strerror(errno));
+                    }
                 }
-                moved_node = NULL;
-                /* TODO: do we need to re-index at this point? */
-            }
-        } else {
-            if(moved_node) {
-                fprintf(stderr, "error: have a moved_from, but didn't get a "
-                        "moved_to!\n");
-                exit(1);
             }
         }
         if(ev[i]->mask & IN_MOVED_FROM) {
-            if(moved_node) {
-                fprintf(stderr, "error: already have a moved_from!\n");
-                exit(1);
-            }
-            moved_node = lookup_node(t, ev[i]->name);
+            TreeNode *moved_node = lookup_node(t, ev[i]->name);
+            node_moved_from(ev[i]->cookie, moved_node);
             printf("Moved from is %p\n", moved_node);
         }
 
@@ -494,6 +538,10 @@ int main(int argc, char **argv) {
             fprintf(stderr, "warning: unexpected revents for inotify: %d\n",
                     fds[1].revents);
         }
+
+        /* TODO: now reindex any nodes that have index=0 (and that have
+         * changed since last time we reindexed)
+         */
     }
 
     free_node(t);
