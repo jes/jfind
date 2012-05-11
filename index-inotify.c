@@ -64,8 +64,11 @@ TreeNode *lookup_node(TreeNode *t, char *path) {
         if((endpath = strchr(path, '/')))
             *endpath = '\0';
 
+        /* cache nchilds because t can be changed */
+        int nchilds = t->nchilds;
+
         int i;
-        for(i = 0; i < t->nchilds; i++) {
+        for(i = 0; i < nchilds; i++) {
             if(strcmp(t->child[i]->name, path) == 0) {
                 if(endpath) {
                     *endpath = '/';
@@ -78,7 +81,7 @@ TreeNode *lookup_node(TreeNode *t, char *path) {
             }
         }
 
-        if(i == t->nchilds) /* no such child was found */
+        if(i == nchilds) /* no such child was found */
             return NULL;
     }
 
@@ -130,7 +133,7 @@ char *node_name(TreeNode *t) {
     while(t) {
         if(*t->name) {
             char *newpath = malloc(strlen(t->name) + strlen(path) + 3);
-            sprintf(newpath, "/%s/%s", t->name, path);
+            sprintf(newpath, "%s%s/%s", (*t->name ? "/" : ""), t->name, path);
             free(path);
             path = newpath;
         }
@@ -256,10 +259,10 @@ void search(TreeNode *t, char *path, const char *term) {
 }
 
 /* return -1 on error and 0 on success */
-int do_inotify(TreeNode *t) {
+int do_inotify(TreeNode *root) {
     char buf[1024];
     struct inotify_event *ev[1024 / sizeof(struct inotify_event) + 1];
-    static char *moved_from = NULL;
+    static TreeNode *moved_node = NULL;
 
     int n;
     if((n = read(ifd, buf, 1024)) <= 0) {
@@ -349,22 +352,31 @@ int do_inotify(TreeNode *t) {
             free_node(node);
         }
         if(ev[i]->mask & IN_MOVED_TO) {
-            moved_from = NULL;
-            /* TODO: manipulate the tree */
-            /* TODO: do we nede to re-index at this point? */
+            if(!moved_node) {
+                fprintf(stderr, "error: got moved_to but no moved_from!\n");
+                exit(1);
+            } else {
+                remove_node(moved_node);
+                free(moved_node->name);
+                moved_node->name = strdup(ev[i]->name);
+                add_child(t, moved_node);
+                moved_node = NULL;
+                /* TODO: do we need to re-index at this point? */
+            }
         } else {
-            if(moved_from) {
+            if(moved_node) {
                 fprintf(stderr, "error: have a moved_from, but didn't get a "
                         "moved_to!\n");
                 exit(1);
             }
         }
         if(ev[i]->mask & IN_MOVED_FROM) {
-            if(moved_from) {
+            if(moved_node) {
                 fprintf(stderr, "error: already have a moved_from!\n");
                 exit(1);
             }
-            moved_from = strdup(ev[i]->name);
+            moved_node = lookup_node(t, ev[i]->name);
+            printf("Moved from is %p\n", moved_node);
         }
 
         free(name);
