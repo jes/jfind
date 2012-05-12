@@ -298,6 +298,7 @@ NodeMove *node_for_cookie(int cookie) {
 /* delete the given cookie from the node_move_hash */
 void unhash_nodemove(NodeMove *m) {
     HASH_DEL(node_move_hash, m);
+    free(m);
 }
 
 /* return -1 on error and 0 on success */
@@ -539,7 +540,7 @@ int main(int argc, char **argv) {
                     fds[1].revents);
         }
 
-        /* TODO: now reindex any nodes that have index=0 (and that have
+        /* TODO: now reindex any nodes that have indexed=0 (and that have
          * changed since last time we reindexed)
          */
     }
