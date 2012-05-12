@@ -21,16 +21,19 @@
    don't need childs, hash handle)
 */
 
-typedef struct TreeNode {
-    char is_dir;
-    char indexed;
-    int cookie;
+typedef struct DirInfo {
+    struct TreeNode *t;
     int wd;
     int nchilds;
-    struct TreeNode *parent;
     struct TreeNode **child;
-    char *name;
     UT_hash_handle hh;
+} DirInfo;
+
+typedef struct TreeNode {
+    char indexed;
+    struct TreeNode *parent;
+    char *name;
+    DirInfo *dir;
 } TreeNode;
 
 typedef struct NodeMove {
@@ -46,7 +49,7 @@ int *descr;
 
 char path[PATH_MAX > 32768 ? PATH_MAX : 32768];
 
-TreeNode *node_wd_hash;
+DirInfo *node_wd_hash;
 NodeMove *node_move_hash;
 
 TreeNode *new_treenode(const char *name) {
@@ -54,14 +57,26 @@ TreeNode *new_treenode(const char *name) {
 
     memset(t, 0, sizeof(*t));
     t->name = strdup(name);
-    t->wd = -1;
 
     return t;
 }
 
+DirInfo *new_dirinfo(TreeNode *t) {
+    DirInfo *d = malloc(sizeof(DirInfo));
+
+    memset(d, 0, sizeof(*d));
+    d->t = t;
+    d->wd = -1;
+
+    return d;
+}
+
 void add_child(TreeNode *t, TreeNode *child) {
-    t->child = realloc(t->child, (t->nchilds + 1) * sizeof(TreeNode*));
-    t->child[t->nchilds++] = child;
+    if(!t->dir)
+        t->dir = new_dirinfo(t);
+    t->dir->child = realloc(t->dir->child,
+            (t->dir->nchilds + 1) * sizeof(TreeNode*));
+    t->dir->child[t->dir->nchilds++] = child;
     child->parent = t;
 }
 
@@ -74,19 +89,22 @@ TreeNode *lookup_node(TreeNode *t, char *path) {
         if((endpath = strchr(path, '/')))
             *endpath = '\0';
 
+        if(!t->dir) /* the child node can't be found if not a directory */
+            return NULL;
+
         /* cache nchilds because t can be changed */
-        int nchilds = t->nchilds;
+        int nchilds = t->dir->nchilds;
 
         int i;
         for(i = 0; i < nchilds; i++) {
-            if(strcmp(t->child[i]->name, path) == 0) {
+            if(strcmp(t->dir->child[i]->name, path) == 0) {
                 if(endpath) {
                     *endpath = '/';
                     path = endpath+1;
                 } else {
                     path += strlen(path);
                 }
-                t = t->child[i];
+                t = t->dir->child[i];
                 break;
             }
         }
@@ -103,12 +121,12 @@ void remove_node(TreeNode *t) {
         return;
 
     int i;
-    for(i = 0; i < t->parent->nchilds; i++) {
-        if(t->parent->child[i] == t)
+    for(i = 0; i < t->parent->dir->nchilds; i++) {
+        if(t->parent->dir->child[i] == t)
             break;
     }
 
-    if(i == t->parent->nchilds) {
+    if(i == t->parent->dir->nchilds) {
         /* !!! CONSISTENCY FAILURE !!! */
         fprintf(stderr, "warning: remove_node: node does not appear as a "
                 "child of its parent!\n");
@@ -116,13 +134,13 @@ void remove_node(TreeNode *t) {
     }
 
     /* move the remaining children along */
-    memmove(t->parent->child + i, t->parent->child + i + 1,
-            sizeof(TreeNode*) * (t->parent->nchilds - i - 1));
+    memmove(t->parent->dir->child + i, t->parent->dir->child + i + 1,
+            sizeof(TreeNode*) * (t->parent->dir->nchilds - i - 1));
 
-    t->parent->nchilds--;
+    t->parent->dir->nchilds--;
 
-    t->parent->child = realloc(t->parent->child,
-            t->parent->nchilds * sizeof(TreeNode*));
+    t->parent->dir->child = realloc(t->parent->dir->child,
+            t->parent->dir->nchilds * sizeof(TreeNode*));
 }
 
 TreeNode *remove_path(TreeNode *t, char *path) {
@@ -136,7 +154,7 @@ TreeNode *remove_path(TreeNode *t, char *path) {
 
 char *node_name(TreeNode *t) {
     char *path = malloc(strlen(t->name) + 2);
-    sprintf(path, "%s%s", t->name, t->is_dir ? "/" : "");
+    sprintf(path, "%s%s", t->name, t->dir ? "/" : "");
 
     t = t->parent;
 
@@ -161,26 +179,40 @@ char *node_name(TreeNode *t) {
 }
 
 TreeNode *node_for_wd(int wd) {
-    TreeNode *t;
+    DirInfo *d;
 
-    HASH_FIND_INT(node_wd_hash, &wd, t);
+    HASH_FIND_INT(node_wd_hash, &wd, d);
 
-    return t;
+    return d->t;
 }
 
+void free_dirinfo(DirInfo *d);
+
 void free_node(TreeNode *t) {
-    int i;
     if(!t)
         return;
-    for(i = 0; i < t->nchilds; i++) {
-        free_node(t->child[i]);
-    }
-    /* TODO: delete from node_move_hash */
-    if(t->is_dir && t->wd != -1)
-        HASH_DEL(node_wd_hash, t);
-    free(t->child);
+
+    free_dirinfo(t->dir);
     free(t->name);
     free(t);
+}
+
+void free_dirinfo(DirInfo *d) {
+    if(!d)
+        return;
+
+    int i;
+    for(i = 0; i < d->nchilds; i++) {
+        free_node(d->child[i]);
+    }
+    free(d->child);
+
+    /* TODO: delete from node_move_hash */
+    if(d->wd != -1)
+        HASH_DEL(node_wd_hash, d);
+
+    d->t->dir = NULL;
+    free(d);
 }
 
 /* recursively index the filesystem starting at the given path */
@@ -193,6 +225,10 @@ void indexfs(TreeNode *t, char *path) {
         fprintf(stderr, "fail: strlen(path) = %ld\n", strlen(path));
         exit(1);
     }
+
+    char *endpath = path + strlen(path);
+
+    strcat(path, "/");
 
     if(!(dp = opendir(path))) {
         fprintf(stderr, "opendir %s: %s\n", path, strerror(errno));
@@ -209,16 +245,17 @@ void indexfs(TreeNode *t, char *path) {
     if(t->parent == NULL)
         mask |= IN_DELETE_SELF;
 
-    /* TODO: watch IN_ATTRIB if access control is added */
-    if((t->wd = inotify_add_watch(ifd, path, mask)) == -1) {
-        fprintf(stderr, "inotify_add_watch(%s): %s\n", path, strerror(errno));
-    } else {
-        HASH_ADD_INT(node_wd_hash, wd, t);
+    if(!t->dir) {
+        fprintf(stderr, "error: indexing a non-directory: %s\n", node_name(t));
+        exit(1);
     }
 
-    char *endpath = path + strlen(path);
-
-    strcat(path, "/");
+    /* TODO: watch IN_ATTRIB if access control is added */
+    if((t->dir->wd = inotify_add_watch(ifd, path, mask)) == -1) {
+        fprintf(stderr, "inotify_add_watch(%s): %s\n", path, strerror(errno));
+    } else {
+        HASH_ADD_INT(node_wd_hash, wd, t->dir);
+    }
 
     while((de = readdir(dp))) {
         if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
@@ -238,14 +275,12 @@ void indexfs(TreeNode *t, char *path) {
 
         t->indexed = 1;
 
-        child->is_dir = S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode);
-
-        if(child->is_dir) {
-            /* TODO: security */
+        if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
+            child->dir = new_dirinfo(child);
             indexfs(child, path);
         }
 
-        if(child->is_dir)
+        if(child->dir)
             ndirs++;
         else
             nfiles++;
@@ -262,7 +297,7 @@ void search(TreeNode *t, char *path, const char *term) {
 
     /* TODO: security */
     strcat(path, t->name);
-    if(t->is_dir)
+    if(t->dir)
         strcat(path, "/");
 
     if(strstr(path, term)) {
@@ -270,9 +305,11 @@ void search(TreeNode *t, char *path, const char *term) {
         printf("%s\n", path);
     }
 
-    int i;
-    for(i = 0; i < t->nchilds; i++) {
-        search(t->child[i], path, term);
+    if(t->dir) {
+        int i;
+        for(i = 0; i < t->dir->nchilds; i++) {
+            search(t->dir->child[i], path, term);
+        }
     }
 
     *endpath = '\0';
@@ -378,7 +415,7 @@ int do_inotify(TreeNode *root) {
             if((lstat(indexfrom, &statbuf)) == 0) {
                 new->indexed = 1;
                 if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
-                    new->is_dir = 1;
+                    new->dir = new_dirinfo(new);
                     strcat(indexfrom, "/");
                     indexfs(new, indexfrom);
                 }
@@ -424,7 +461,7 @@ int do_inotify(TreeNode *root) {
                         moved_node->indexed = 1;
                         if(S_ISDIR(statbuf.st_mode)
                                 && !S_ISLNK(statbuf.st_mode)) {
-                            moved_node->is_dir = 1;
+                            moved_node->dir = new_dirinfo(moved_node);
                             strcat(indexfrom, "/");
                             indexfs(moved_node, indexfrom);
                         }
@@ -459,6 +496,7 @@ int do_search(TreeNode *t) {
     nresults = 0;
 
     gettimeofday(&start, NULL);
+    /* TODO: handle SIGINT to abort the search */
     search(t, path, buf);
     gettimeofday(&stop, NULL);
 
@@ -477,7 +515,7 @@ int do_search(TreeNode *t) {
 
 int main(int argc, char **argv) {
     if(argc != 2) {
-        fprintf(stderr, "usage: index ROOT\n");
+        fprintf(stderr, "usage: index-inotify ROOT\n");
         return 1;
     }
 
@@ -495,7 +533,7 @@ int main(int argc, char **argv) {
         path[strlen(path)-1] = '\0';
 
     TreeNode *t = new_treenode("");
-    t->is_dir = 1; /* hopefully! */
+    t->dir = new_dirinfo(t); /* TODO: check that "path" is actually a dir */
 
     gettimeofday(&start, NULL);
     indexfs(t, path);
