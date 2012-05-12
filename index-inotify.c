@@ -407,9 +407,7 @@ int do_inotify(TreeNode *root) {
         if(ev[i]->mask & IN_CREATE) {
             TreeNode *new = new_treenode(ev[i]->name);
             char indexfrom[32768];
-            fprintf(stderr, "{%s, %s, %s}\n", path, name, ev[i]->name);
             sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
-            fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
             struct stat statbuf;
             add_child(t, new);
             if((lstat(indexfrom, &statbuf)) == 0) {
