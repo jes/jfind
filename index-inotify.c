@@ -183,7 +183,10 @@ TreeNode *node_for_wd(int wd) {
 
     HASH_FIND_INT(node_wd_hash, &wd, d);
 
-    return d->t;
+    if(d)
+        return d->t;
+    else
+        return NULL;
 }
 
 void free_dirinfo(DirInfo *d);
@@ -404,76 +407,84 @@ int do_inotify(TreeNode *root) {
         else
             printf("  name: (null)\n");
 
-        if(ev[i]->mask & IN_CREATE) {
-            TreeNode *new = new_treenode(ev[i]->name);
-            char indexfrom[32768];
-            sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
-            struct stat statbuf;
-            add_child(t, new);
-            if((lstat(indexfrom, &statbuf)) == 0) {
-                new->indexed = 1;
-                if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
-                    new->dir = new_dirinfo(new);
-                    strcat(indexfrom, "/");
-                    indexfs(new, indexfrom);
+        if(t) {
+            if(ev[i]->mask & IN_CREATE) {
+                TreeNode *new = new_treenode(ev[i]->name);
+                char indexfrom[32768];
+                sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
+                struct stat statbuf;
+                add_child(t, new);
+                if((lstat(indexfrom, &statbuf)) == 0) {
+                    new->indexed = 1;
+                    if(S_ISDIR(statbuf.st_mode) && !S_ISLNK(statbuf.st_mode)) {
+                        new->dir = new_dirinfo(new);
+                        strcat(indexfrom, "/");
+                        indexfs(new, indexfrom);
+                    }
+                } else {
+                    fprintf(stderr, "stat %s: %s\n", indexfrom,
+                            strerror(errno));
                 }
-            } else {
-                fprintf(stderr, "stat %s: %s\n", indexfrom, strerror(errno));
             }
-        }
-        if(ev[i]->mask & IN_DELETE_SELF) {
-            fprintf(stderr, "error: deleted root node! bailing.\n");
-            exit(1);
-        }
-        if(ev[i]->mask & IN_DELETE) {
-            TreeNode *node = remove_path(t, ev[i]->name);
-            free_node(node);
-        }
-        if(ev[i]->mask & IN_MOVED_TO) {
-            NodeMove *m = node_for_cookie(ev[i]->cookie);
-            if(!m) {
-                fprintf(stderr, "error: got a cookie for which we have no "
-                        "node_move!\n");
+            if(ev[i]->mask & IN_DELETE_SELF) {
+                fprintf(stderr, "error: deleted root node! bailing.\n");
                 exit(1);
             }
-            TreeNode *moved_node = m->node;
-            unhash_nodemove(m);
-            if(!moved_node) {
-                fprintf(stderr, "error: got moved_to but no moved_from!\n");
-                exit(1);
-            } else {
-                remove_node(moved_node);
-                free(moved_node->name);
-                moved_node->name = strdup(ev[i]->name);
-                add_child(t, moved_node);
-                if(!moved_node->indexed) {
-                    fprintf(stderr, "warning: %s%s not indexed; trying to "
-                            "re-index!\n", name, ev[i]->name);
+            if(ev[i]->mask & IN_DELETE) {
+                TreeNode *node = remove_path(t, ev[i]->name);
+                free_node(node);
+            }
+            if(ev[i]->mask & IN_MOVED_TO) {
+                NodeMove *m = node_for_cookie(ev[i]->cookie);
+                if(!m) {
+                    fprintf(stderr, "error: got a cookie for which we have no "
+                            "node_move!\n");
+                    exit(1);
+                }
+                TreeNode *moved_node = m->node;
+                unhash_nodemove(m);
+                if(!moved_node) {
+                    fprintf(stderr, "error: got moved_to but no moved_from!\n");
+                    exit(1);
+                } else {
+                    remove_node(moved_node);
+                    free(moved_node->name);
+                    moved_node->name = strdup(ev[i]->name);
+                    add_child(t, moved_node);
+                    if(!moved_node->indexed) {
+                        fprintf(stderr, "warning: %s%s not indexed; trying to "
+                                "re-index!\n", name, ev[i]->name);
 
-                    char indexfrom[32768];
-                    fprintf(stderr, "{%s, %s, %s}\n", path, name, ev[i]->name);
-                    sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
-                    fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
-                    struct stat statbuf;
-                    if((lstat(indexfrom, &statbuf)) == 0) {
-                        moved_node->indexed = 1;
-                        if(S_ISDIR(statbuf.st_mode)
-                                && !S_ISLNK(statbuf.st_mode)) {
-                            moved_node->dir = new_dirinfo(moved_node);
-                            strcat(indexfrom, "/");
-                            indexfs(moved_node, indexfrom);
+                        char indexfrom[32768];
+                        fprintf(stderr, "{%s, %s, %s}\n", path, name,
+                                ev[i]->name);
+                        sprintf(indexfrom, "%s%s%s", path, name, ev[i]->name);
+                        fprintf(stderr, "{indexfrom=%s}\n", indexfrom);
+                        struct stat statbuf;
+                        if((lstat(indexfrom, &statbuf)) == 0) {
+                            moved_node->indexed = 1;
+                            if(S_ISDIR(statbuf.st_mode)
+                                    && !S_ISLNK(statbuf.st_mode)) {
+                                moved_node->dir = new_dirinfo(moved_node);
+                                strcat(indexfrom, "/");
+                                indexfs(moved_node, indexfrom);
+                            }
+                        } else {
+                            fprintf(stderr, "stat %s: %s\n", indexfrom,
+                                    strerror(errno));
                         }
-                    } else {
-                        fprintf(stderr, "stat %s: %s\n", indexfrom,
-                                strerror(errno));
                     }
                 }
             }
-        }
-        if(ev[i]->mask & IN_MOVED_FROM) {
-            TreeNode *moved_node = lookup_node(t, ev[i]->name);
-            node_moved_from(ev[i]->cookie, moved_node);
-            printf("Moved from is %p\n", moved_node);
+            if(ev[i]->mask & IN_MOVED_FROM) {
+                TreeNode *moved_node = lookup_node(t, ev[i]->name);
+                node_moved_from(ev[i]->cookie, moved_node);
+                printf("Moved from is %p\n", moved_node);
+            }
+        } else if(ev[i]->mask != IN_IGNORED) {
+            fprintf(stderr, "error: mask 0x%08x != IN_IGNORED and wd not in "
+                    "hash!\n", ev[i]->mask);
+            exit(1);
         }
 
         free(name);
