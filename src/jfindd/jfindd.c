@@ -26,8 +26,14 @@ void help(void) {
     );
 }
 
-int print_path(const char *s) {
-    printf("%s\n", s);
+static char *search_term;
+
+/* a callback for traverse() */
+/* TODO: if this is slow, build it into traverse() */
+int search(const char *s) {
+    if(strstr(s, search_term))
+        printf("%s\n", s);
+
     return 0;
 }
 
@@ -73,7 +79,15 @@ int main(int argc, char **argv) {
     while(optind < argc)
         indexfrom(root, argv[optind++]);
 
-    traverse(root, "/", print_path);
+    /* set up a search interface */
+    /* TODO: do this over unix domain sockets */
+    char buf[1024];
+    while(fgets(buf, 1024, stdin)) {
+        search_buf = buf;
+        if(buf[strlen(buf)-1] == '\n')
+            buf[strlen(buf)-1] = '\0';
+        traverse(root, "/", search);
+    }
 
     return 0;
 }
