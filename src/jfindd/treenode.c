@@ -13,7 +13,7 @@ TreeNode *new_treenode(const char *name) {
 
     assert(!strchr(name, '/'));/* this should be the name of a single node */
 
-    memset(t, 0, sizeof(t));
+    memset(t, 0, sizeof(TreeNode));
     t->name = strdup(name);
 
     return t;
@@ -77,6 +77,7 @@ TreeNode *create_path(TreeNode *t, char *path) {
         /* no such child was found */
         if(i == nchilds) {
             TreeNode *child = new_treenode(path);
+            add_child(t, child);
 
             if(endpath) {
                 *endpath = '/';

@@ -11,7 +11,7 @@ static DirInfo *wd_hash;
 DirInfo *new_dirinfo(TreeNode *t) {
     DirInfo *d = malloc(sizeof(DirInfo));
 
-    memset(d, 0, sizeof(DirInfo*));
+    memset(d, 0, sizeof(DirInfo));
     d->t = t;
     d->wd = -1;
 

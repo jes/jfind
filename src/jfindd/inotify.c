@@ -9,6 +9,14 @@
 
 static int ifd;
 
+/* initialise inotify, printing a message and dying if there is a problem */
+void init_inotify(void) {
+	if((ifd = inotify_init()) == -1) {
+		perror("inotify_init");
+		exit(1);
+	}
+}
+
 /* watch the given directory (corresponding to the given node) with inotify;
  * print an error and return as normal if watching fails
  */

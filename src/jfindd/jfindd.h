@@ -41,7 +41,7 @@ typedef struct TreeNode {
  * usually followed immediately by the corresponding IN_MOVED_TO, this is not
  * always the case)
  */
-typedef struct NodeMove {
+typedef struct NodeMove  {
     int cookie;/* the "cookie" field from the inotify event */
     TreeNode *node;/* the node that is being moved */
     UT_hash_handle hh;/* for the hash table mapping cookie to NodeMove */
@@ -65,8 +65,12 @@ DirInfo *dirinfo_for_wd(int wd);
 void free_dirinfo(DirInfo *d);
 
 /* index.c */
+typedef int (*TraversalFunc)(const char *);
+
 int isdir(const char *path);
 int indexfrom(TreeNode *root, const char *relpath);
+int traverse(TreeNode *root, const char *path, TraversalFunc callback);
 
 /* inotify.c */
+void init_inotify(void);
 void watch_directory(TreeNode *t, const char *path);

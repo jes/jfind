@@ -6,6 +6,7 @@
 #include "jfindd.h"
 
 static void _indexfs(TreeNode *root, char *path);
+static int _traverse(TreeNode *t, char *path, TraversalFunc callback);
 
 /* return 1 if path is a directory, 0 if it is a non-directory and -1 if an
  * error occurred
@@ -48,6 +49,12 @@ int indexfrom(TreeNode *root, const char *relpath) {
 		return -1;
 	} else if(dir) {
 		t->dir = new_dirinfo(t);
+
+		/* remove a trailing slash if there is one (note: "/" -> "" but that's
+		 * OK)
+		 */
+		if(path[strlen(path)-1] == '/')
+			path[strlen(path)-1] = '\0';
 		_indexfs(t, path);
 	}
 
@@ -55,7 +62,8 @@ int indexfrom(TreeNode *root, const char *relpath) {
 }
 
 /* recursively index the filesystem starting from the given node and path;
- * path is modified but is restored to its original state
+ * path is modified but is restored to its original state, and should have at
+ * least PATH_MAX bytes of storage
  */
 static void _indexfs(TreeNode *root, char *path) {
 	char *endpath = path + strlen(path);
@@ -110,10 +118,80 @@ static void _indexfs(TreeNode *root, char *path) {
 		}
 	}
 
+	closedir(dp);
+
 	/* TODO: should we handle inotify events here? this can run for a very long
 	 * time indeed and it would be a shame if the inotify queue became full
 	 * just because we failed to act on new events
 	 */
 
 	*endpath = '\0';
+}
+
+/* traverse the tree depth-first, starting at path, and call the callback for
+ * every node;
+ * if callback returns non-zero, the traversal will be halted;
+ * returns 0 on a full tree traversal, and returns the value returned by the
+ * callback in the case that the traversal is halted prematurely;
+ * returns -1 on error (i.e. "path" is not in the tree or is too long)
+ */
+int traverse(TreeNode *root, const char *path, TraversalFunc callback) {
+	assert(!root->parent);/* this should be actual root */
+
+	/* fail if the path is too long, and copy it if it is ok */
+	if(strlen(path) >= PATH_MAX)
+		return -1;
+	char newpath[PATH_MAX];
+	strcpy(newpath, path);
+
+	/* remove a trailing slash if appropriate */
+	if(newpath[strlen(newpath)-1] == '/')
+		newpath[strlen(newpath)-1] = '\0';
+
+	/* lookup the node and fail if there is no such node */
+	TreeNode *t = lookup_treenode(root, newpath);
+	if(!t)
+		return -1;
+
+	/* do the actual traversal */
+	return _traverse(t, newpath, callback);
+}
+
+/* traverse the entire tree depth-first, calling the callback for every path;
+ * path will be modified but will be restored to its original state, and
+ * should have at least PATH_MAX bytes of storage;
+ * if callback returns non-zero, the traversal will be halted and the returned
+ * value will be teturned;
+ * returns 0 on a full tree traversal, and returns the value returned by the
+ * callback in the case that the traversal is halted prematurely
+ */
+static int _traverse(TreeNode *t, char *path, TraversalFunc callback) {
+	char *endpath = path + strlen(path);
+
+	/* check that the name is small enough */
+	if(strlen(t->name) > PATH_MAX - 2 - strlen(path)) {
+		fprintf(stderr, "error: %s: %s: strlen(t->name) too long!\n",
+				path, t->name);
+		exit(1);
+	}
+	strcat(path, t->name);
+	if(t->dir)
+		strcat(path, "/");
+
+	/* call the user-supplied callback */
+	int n;
+	if((n = callback(path)))
+		return n;
+
+	/* recurse if this is a directory */
+	if(t->dir) {
+		int i;
+		for(i = 0; i < t->dir->nchilds; i++)
+			if((n = _traverse(t->dir->child[i], path, callback)))
+				return n;
+	}
+
+	*endpath = '\0';
+
+	return 0;
 }
