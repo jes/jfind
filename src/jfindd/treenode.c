@@ -3,7 +3,7 @@
  * James Stanley 2012
  */
 
-#include "jfind.h"
+#include "jfindd.h"
 
 DirInfo *wd_hash;
 
@@ -140,6 +140,13 @@ char *treenode_name(TreeNode *t) {
     }
 
     return path;
+}
+
+/* set the TreeNode for the given wd */
+void set_treenode_for_wd(int wd, TreeNode *t) {
+    assert(t->dir);/* we only put watches on directories */
+
+    set_dirinfo_for_wd(wd, t->dir);
 }
 
 /* return the TreeNode for the given wd */

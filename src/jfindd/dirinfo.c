@@ -3,7 +3,7 @@
  * James Stanley 2012
  */
 
-#include "jfind.h"
+#include "jfindd.h"
 
 DirInfo *wd_hash;
 
@@ -16,6 +16,12 @@ DirInfo *new_dirinfo(TreeNode *t) {
     d->wd = -1;
 
     return d;
+}
+
+void set_dirinfo_for_wd(int wd, DirInfo *d) {
+    assert(wd != -1);/* -1 is not a valid watch descriptor, so it is a bug */
+
+    HASH_ADD_INT(wd_hash, wd, t->dir);
 }
 
 /* return the DirInfo for the given watch descriptor */

@@ -1,4 +1,4 @@
-/* Header file for jfind
+/* Header file for jfindd
  *
  * James Stanley 2012
  */

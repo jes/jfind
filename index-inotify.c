@@ -341,6 +341,10 @@ void unhash_nodemove(NodeMove *m) {
     free(m);
 }
 
+/* reindex under the given node,
+void reindex(TreeNode *t, char *path) {
+}
+
 /* return -1 on error and 0 on success */
 int do_inotify(TreeNode *root) {
     char buf[1024];
