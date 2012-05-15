@@ -14,8 +14,10 @@ static int _traverse(TreeNode *t, char *path, TraversalFunc callback);
 int isdir(const char *path) {
 	struct stat buf;
 
-	if(lstat(path, &buf) == -1)
+	if(lstat(path, &buf) == -1) {
+		fprintf(stderr, "stat: %s: %s\n", path, strerror(errno));
 		return -1;
+	}
 
 	return S_ISDIR(buf.st_mode) && !S_ISLNK(buf.st_mode);
 }
@@ -45,7 +47,6 @@ int indexfrom(TreeNode *root, const char *relpath) {
 	/* if the path is a directory, make it so and index under it */
 	int dir;
 	if((dir = isdir(path)) == -1) {
-		fprintf(stderr, "stat: %s: %s\n", path, strerror(errno));
 		return -1;
 	} else if(dir) {
 		t->dir = new_dirinfo(t);
@@ -110,7 +111,6 @@ static void _indexfs(TreeNode *root, char *path) {
 		/* if this node is a directory, recurse */
 		int dir;
 		if((dir = isdir(path)) == -1) {
-			fprintf(stderr, "stat %s: %s\n", path, strerror(errno));
 			continue;
 		} else if(dir) {
 			child->dir = new_dirinfo(child);

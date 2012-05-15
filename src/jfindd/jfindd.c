@@ -13,7 +13,7 @@ static struct option opts[] = {
 };
 
 /* --help output */
-void help(void) {
+static void help(void) {
     fprintf(stderr,
     "usage: jfindd [options] paths...\n"
     "\n"
@@ -30,11 +30,17 @@ static char *search_term;
 
 /* a callback for traverse() */
 /* TODO: if this is slow, build it into traverse() */
-int search(const char *s) {
+static int search(const char *s) {
     if(strstr(s, search_term))
         printf("%s\n", s);
 
     return 0;
+}
+
+/* return the difference in seconds between *start and *stop */
+static double difftimeofday(struct timeval *start, struct timeval *stop) {
+    return (stop->tv_sec - start->tv_sec)
+        + (stop->tv_usec - start->tv_usec) / 1000000.0;
 }
 
 int main(int argc, char **argv) {
@@ -75,19 +81,35 @@ int main(int argc, char **argv) {
     root = new_treenode("");
     root->dir = new_dirinfo(root);
 
+    struct timeval start, stop;
+
     /* index all of the directories requested */
+    gettimeofday(&start, NULL);
     while(optind < argc)
         indexfrom(root, argv[optind++]);
+    gettimeofday(&stop, NULL);
+
+    printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
 
     /* set up a search interface */
+    printf("? "); fflush(stdout);
     /* TODO: do this over unix domain sockets */
     char buf[1024];
     while(fgets(buf, 1024, stdin)) {
-        search_buf = buf;
+        search_term = buf;
         if(buf[strlen(buf)-1] == '\n')
             buf[strlen(buf)-1] = '\0';
+
+        gettimeofday(&start, NULL);
         traverse(root, "/", search);
+        gettimeofday(&stop, NULL);
+        printf("Search took %.3fms.\n\n",
+                difftimeofday(&start, &stop) * 1000.0);
+
+        printf("? "); fflush(stdout);
     }
+
+    free_treenode(root);
 
     return 0;
 }

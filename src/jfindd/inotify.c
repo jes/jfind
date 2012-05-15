@@ -26,3 +26,7 @@ void watch_directory(TreeNode *t, const char *path) {
 	if((t->dir->wd = inotify_add_watch(ifd, path, WATCH_MASK)) == -1)
 		fprintf(stderr, "inotify_add_watch: %s: %s\n", path, strerror(errno));
 }
+
+/* deal with any new inotify events */
+void handle_inotify_events(void) {
+}
