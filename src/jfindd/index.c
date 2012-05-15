@@ -12,54 +12,54 @@ static int _traverse(TreeNode *t, char *path, TraversalFunc callback);
  * error occurred
  */
 int isdir(const char *path) {
-	struct stat buf;
+    struct stat buf;
 
-	if(lstat(path, &buf) == -1) {
-		fprintf(stderr, "stat: %s: %s\n", path, strerror(errno));
-		return -1;
-	}
+    if(lstat(path, &buf) == -1) {
+        fprintf(stderr, "stat: %s: %s\n", path, strerror(errno));
+        return -1;
+    }
 
-	return S_ISDIR(buf.st_mode) && !S_ISLNK(buf.st_mode);
+    return S_ISDIR(buf.st_mode) && !S_ISLNK(buf.st_mode);
 }
 
 /* index the filesystem starting from the given path; print something to stderr
  * and return -1 if there are
  */
 int indexfrom(TreeNode *root, const char *relpath) {
-	char path[PATH_MAX];
+    char path[PATH_MAX];
 
-	assert(!root->parent);/* root should be actual root */
+    assert(!root->parent);/* root should be actual root */
 
-	/* get an absolute path */
-	if(!realpath(relpath, path)) {
-		fprintf(stderr, "error: realpath: %s\n", strerror(errno));
-		return -1;
-	}
+    /* get an absolute path */
+    if(!realpath(relpath, path)) {
+        fprintf(stderr, "error: realpath: %s\n", strerror(errno));
+        return -1;
+    }
 
-	/* get a node describing this path */
-	TreeNode *t;
-	if(!(t = create_path(root, path))) {
-		fprintf(stderr, "error: adding %s to tree: Not a directory\n",
-				path);
-		return -1;
-	}
+    /* get a node describing this path */
+    TreeNode *t;
+    if(!(t = create_path(root, path))) {
+        fprintf(stderr, "error: adding %s to tree: Not a directory\n",
+                path);
+        return -1;
+    }
 
-	/* if the path is a directory, make it so and index under it */
-	int dir;
-	if((dir = isdir(path)) == -1) {
-		return -1;
-	} else if(dir) {
-		t->dir = new_dirinfo(t);
+    /* if the path is a directory, make it so and index under it */
+    int dir;
+    if((dir = isdir(path)) == -1) {
+        return -1;
+    } else if(dir) {
+        t->dir = new_dirinfo(t);
 
-		/* remove a trailing slash if there is one (note: "/" -> "" but that's
-		 * OK)
-		 */
-		if(path[strlen(path)-1] == '/')
-			path[strlen(path)-1] = '\0';
-		_indexfs(t, path);
-	}
+        /* remove a trailing slash if there is one (note: "/" -> "" but that's
+         * OK)
+         */
+        if(path[strlen(path)-1] == '/')
+            path[strlen(path)-1] = '\0';
+        _indexfs(t, path);
+    }
 
-	return 0;
+    return 0;
 }
 
 /* recursively index the filesystem starting from the given node and path;
@@ -67,65 +67,65 @@ int indexfrom(TreeNode *root, const char *relpath) {
  * least PATH_MAX bytes of storage
  */
 static void _indexfs(TreeNode *root, char *path) {
-	char *endpath = path + strlen(path);
+    char *endpath = path + strlen(path);
 
-	assert(root->dir);/* can't index under a non-directory */
+    assert(root->dir);/* can't index under a non-directory */
 
-	/* ensure the path is not too long */
-	if(strlen(path) >= PATH_MAX-1) {
-		fprintf(stderr, "error: %s: strlen(path) too long!\n", path);
-		exit(1);
-	}
-	strcat(path, "/");
+    /* ensure the path is not too long */
+    if(strlen(path) >= PATH_MAX-1) {
+        fprintf(stderr, "error: %s: strlen(path) too long!\n", path);
+        exit(1);
+    }
+    strcat(path, "/");
 
-	DIR *dp;
-	if(!(dp = opendir(path))) {
-		fprintf(stderr, "opendir: %s: %s\n", path, strerror(errno));
-		return;
-	}
+    DIR *dp;
+    if(!(dp = opendir(path))) {
+        fprintf(stderr, "opendir: %s: %s\n", path, strerror(errno));
+        return;
+    }
 
-	/* watch this path with inotify */
-	watch_directory(root, path);
+    /* watch this path with inotify */
+    watch_directory(root, path);
 
-	/* loop over all of the entries in the directory */
-	struct dirent *de;
-	while((de = readdir(dp))) {
-		if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
-			continue;
+    /* loop over all of the entries in the directory */
+    struct dirent *de;
+    while((de = readdir(dp))) {
+        if(strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
+            continue;
 
-		/* end the path at the right place */
-		*(endpath + 1) = '\0';
+        /* end the path at the right place */
+        *(endpath + 1) = '\0';
 
-		/* check that de->d_name is short enough to append to path */
-		if(strlen(de->d_name) > PATH_MAX - 1 - strlen(path)) {
-			fprintf(stderr, "error: %s: %s: strlen(de->d_name) too long!\n",
-					path, de->d_name);
-			exit(1);
-		}
-		strcat(path, de->d_name);
+        /* check that de->d_name is short enough to append to path */
+        if(strlen(de->d_name) > PATH_MAX - 1 - strlen(path)) {
+            fprintf(stderr, "error: %s: %s: strlen(de->d_name) too long!\n",
+                    path, de->d_name);
+            exit(1);
+        }
+        strcat(path, de->d_name);
 
-		/* add a new node to the tree */
-		TreeNode *child = new_treenode(de->d_name);
-		add_child(root, child);
+        /* add a new node to the tree */
+        TreeNode *child = new_treenode(de->d_name);
+        add_child(root, child);
 
-		/* if this node is a directory, recurse */
-		int dir;
-		if((dir = isdir(path)) == -1) {
-			continue;
-		} else if(dir) {
-			child->dir = new_dirinfo(child);
-			_indexfs(child, path);
-		}
-	}
+        /* if this node is a directory, recurse */
+        int dir;
+        if((dir = isdir(path)) == -1) {
+            continue;
+        } else if(dir) {
+            child->dir = new_dirinfo(child);
+            _indexfs(child, path);
+        }
+    }
 
-	closedir(dp);
+    closedir(dp);
 
-	/* TODO: should we handle inotify events here? this can run for a very long
-	 * time indeed and it would be a shame if the inotify queue became full
-	 * just because we failed to act on new events
-	 */
+    /* TODO: should we handle inotify events here? this can run for a very long
+     * time indeed and it would be a shame if the inotify queue became full
+     * just because we failed to act on new events
+     */
 
-	*endpath = '\0';
+    *endpath = '\0';
 }
 
 /* traverse the tree depth-first, starting at path, and call the callback for
@@ -136,25 +136,25 @@ static void _indexfs(TreeNode *root, char *path) {
  * returns -1 on error (i.e. "path" is not in the tree or is too long)
  */
 int traverse(TreeNode *root, const char *path, TraversalFunc callback) {
-	assert(!root->parent);/* this should be actual root */
+    assert(!root->parent);/* this should be actual root */
 
-	/* fail if the path is too long, and copy it if it is ok */
-	if(strlen(path) >= PATH_MAX)
-		return -1;
-	char newpath[PATH_MAX];
-	strcpy(newpath, path);
+    /* fail if the path is too long, and copy it if it is ok */
+    if(strlen(path) >= PATH_MAX)
+        return -1;
+    char newpath[PATH_MAX];
+    strcpy(newpath, path);
 
-	/* remove a trailing slash if appropriate */
-	if(newpath[strlen(newpath)-1] == '/')
-		newpath[strlen(newpath)-1] = '\0';
+    /* remove a trailing slash if appropriate */
+    if(newpath[strlen(newpath)-1] == '/')
+        newpath[strlen(newpath)-1] = '\0';
 
-	/* lookup the node and fail if there is no such node */
-	TreeNode *t = lookup_treenode(root, newpath);
-	if(!t)
-		return -1;
+    /* lookup the node and fail if there is no such node */
+    TreeNode *t = lookup_treenode(root, newpath);
+    if(!t)
+        return -1;
 
-	/* do the actual traversal */
-	return _traverse(t, newpath, callback);
+    /* do the actual traversal */
+    return _traverse(t, newpath, callback);
 }
 
 /* traverse the entire tree depth-first, calling the callback for every path;
@@ -166,32 +166,32 @@ int traverse(TreeNode *root, const char *path, TraversalFunc callback) {
  * callback in the case that the traversal is halted prematurely
  */
 static int _traverse(TreeNode *t, char *path, TraversalFunc callback) {
-	char *endpath = path + strlen(path);
+    char *endpath = path + strlen(path);
 
-	/* check that the name is small enough */
-	if(strlen(t->name) > PATH_MAX - 2 - strlen(path)) {
-		fprintf(stderr, "error: %s: %s: strlen(t->name) too long!\n",
-				path, t->name);
-		exit(1);
-	}
-	strcat(path, t->name);
-	if(t->dir)
-		strcat(path, "/");
+    /* check that the name is small enough */
+    if(strlen(t->name) > PATH_MAX - 2 - strlen(path)) {
+        fprintf(stderr, "error: %s: %s: strlen(t->name) too long!\n",
+                path, t->name);
+        exit(1);
+    }
+    strcat(path, t->name);
+    if(t->dir)
+        strcat(path, "/");
 
-	/* call the user-supplied callback */
-	int n;
-	if((n = callback(path)))
-		return n;
+    /* call the user-supplied callback */
+    int n;
+    if((n = callback(path)))
+        return n;
 
-	/* recurse if this is a directory */
-	if(t->dir) {
-		int i;
-		for(i = 0; i < t->dir->nchilds; i++)
-			if((n = _traverse(t->dir->child[i], path, callback)))
-				return n;
-	}
+    /* recurse if this is a directory */
+    if(t->dir) {
+        int i;
+        for(i = 0; i < t->dir->nchilds; i++)
+            if((n = _traverse(t->dir->child[i], path, callback)))
+                return n;
+    }
 
-	*endpath = '\0';
+    *endpath = '\0';
 
-	return 0;
+    return 0;
 }
