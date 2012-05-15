@@ -5,7 +5,7 @@
 
 #include "jfindd.h"
 
-DirInfo *wd_hash;
+static DirInfo *wd_hash;
 
 /* allocate and return a DirInfo for the given TreeNode */
 DirInfo *new_dirinfo(TreeNode *t) {
@@ -18,10 +18,11 @@ DirInfo *new_dirinfo(TreeNode *t) {
     return d;
 }
 
+/* set the DirInfo associated with the given wd */
 void set_dirinfo_for_wd(int wd, DirInfo *d) {
     assert(wd != -1);/* -1 is not a valid watch descriptor, so it is a bug */
 
-    HASH_ADD_INT(wd_hash, wd, t->dir);
+    HASH_ADD_INT(wd_hash, wd, d);
 }
 
 /* return the DirInfo for the given watch descriptor */

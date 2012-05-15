@@ -3,9 +3,19 @@
  * James Stanley 2012
  */
 
+#include <sys/inotify.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <getopt.h>
+#include <string.h>
+#include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
+
 #include "uthash.h"
 
 /* store information for a directory
@@ -40,6 +50,7 @@ typedef struct NodeMove {
 /* treenode.c */
 TreeNode *new_treenode(const char *name);
 void add_child(TreeNode *t, TreeNode *child);
+TreeNode *create_path(TreeNode *t, char *path);
 TreeNode *lookup_treenode(TreeNode *t, char *path);
 void remove_treenode(TreeNode *t);
 TreeNode *remove_path(TreeNode *t, char *path);
@@ -49,5 +60,13 @@ void free_treenode(TreeNode *t);
 
 /* dirnode.c */
 DirInfo *new_dirinfo(TreeNode *t);
+void set_dirinfo_for_wd(int wd, DirInfo *d);
 DirInfo *dirinfo_for_wd(int wd);
 void free_dirinfo(DirInfo *d);
+
+/* index.c */
+int isdir(const char *path);
+int indexfrom(TreeNode *root, const char *relpath);
+
+/* inotify.c */
+void watch_directory(TreeNode *t, const char *path);

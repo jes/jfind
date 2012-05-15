@@ -11,6 +11,8 @@ DirInfo *wd_hash;
 TreeNode *new_treenode(const char *name) {
     TreeNode *t = malloc(sizeof(TreeNode));
 
+    assert(!strchr(name, '/'));/* this should be the name of a single node */
+
     memset(t, 0, sizeof(t));
     t->name = strdup(name);
 
@@ -22,7 +24,7 @@ void add_child(TreeNode *t, TreeNode *child) {
     assert(t->dir);/* the parent node must be a directory */
     assert(!child->parent);/* the child node must not already have a parent */
 
-    /* we could double the size of t->dir->child every time, but since
+    /* we could double the size of t->dir->child as necessary, but since
      * TreeNodes are only actually manipulated in I/O-bound situations, that
      * gains little and wastes quite a bit of memory
      */
@@ -31,6 +33,64 @@ void add_child(TreeNode *t, TreeNode *child) {
             (t->dir->nchilds + 1) * sizeof(TreeNode*));
     t->dir->child[t->dir->nchilds++] = child;
     child->parent = t;
+}
+
+/* create all of the directory nodes required for the given path and return the
+ * resulting leaf node, or NULL if an existing node along the way is not a
+ * directory
+ */
+TreeNode *create_path(TreeNode *t, char *path) {
+    if(*path == '/')
+        path++;
+
+    while(*path && strcmp(path, "/") != 0) {
+        if(!t->dir)/* the child node can't be found if not a directory */
+            return NULL;
+
+        /* mark the end of the next path component for strcmp's sake */
+        char *endpath = NULL;
+        if((endpath = strchr(path, '/')))
+            *endpath = '\0';
+
+        /* store nchilds because t gets updated to point at a different node */
+        int nchilds = t->dir->nchilds;
+
+        int i;
+        for(i = 0; i < nchilds; i++) {
+            if(strcmp(t->dir->child[i]->name, path) == 0) {
+                /* if there are more path components, restore *endpath and
+                 * move on, otherwise jump to the end of the path
+                 */
+                if(endpath) {
+                    *endpath = '/';
+                    path = endpath + 1;
+                } else {
+                    path += strlen(path);
+                }
+
+                /* move on to the child */
+                t = t->dir->child[i];
+                break;
+            }
+        }
+
+        /* no such child was found */
+        if(i == nchilds) {
+            TreeNode *child = new_treenode(path);
+
+            if(endpath) {
+                *endpath = '/';
+                path = endpath + 1;
+                child->dir = new_dirinfo(child);
+            } else {
+                path += strlen(path);
+            }
+
+            t = child;
+        }
+    }
+
+    return t;
 }
 
 /* lookup the given path, starting at the given node, and return the node
