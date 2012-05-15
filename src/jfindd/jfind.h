@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "uthash.h"
 
 /* store information for a directory
  * this is a separate structure to TreeNode in the interest of saving memory
@@ -15,13 +16,13 @@ typedef struct DirInfo {
     int wd;/* watch descriptor */
     int nchilds;
     struct TreeNode **child;
-    Ut_hash_handle hh;/* for the hash table mapping wd to DirInfo */
+    UT_hash_handle hh;/* for the hash table mapping wd to DirInfo */
 } DirInfo;
 
 /* store information for an arbitrary node in the fs tree */
 typedef struct TreeNode {
     char indexed;/* 0 if this node needs indexing and 1 otherwise */
-    struct TreeNode **parent;/* the parent node (should be a directory) */
+    struct TreeNode *parent;/* the parent node (should be a directory) */
     char *name;
     DirInfo *dir;/* directory information for non-file nodes */
 } TreeNode;
@@ -33,5 +34,15 @@ typedef struct TreeNode {
 typedef struct NodeMove {
     int cookie;/* the "cookie" field from the inotify event */
     TreeNode *node;/* the node that is being moved */
-    UT_hash_handle_hh;/* for the hash table mapping cookie to NodeMove */
+    UT_hash_handle hh;/* for the hash table mapping cookie to NodeMove */
 } NodeMove;
+
+/* treenode.c */
+TreeNode *new_treenode(const char *name);
+void add_child(TreeNode *t, TreeNode *child);
+TreeNode *lookup_node(TreeNode *t, char *path);
+void remove_node(TreeNode *t);
+TreeNode *remove_path(TreeNode *t, char *path);
+char *node_name(TreeNode *t);
+TreeNode *node_for_wd(int wd);
+void free_node(TreeNode *t);
