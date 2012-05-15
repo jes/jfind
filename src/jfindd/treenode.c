@@ -37,7 +37,7 @@ void add_child(TreeNode *t, TreeNode *child) {
  * described by the path or NULL if there is none
  * path is modified but will be restored to its original state
  */
-TreeNode *lookup_node(TreeNode *t, char *path) {
+TreeNode *lookup_treenode(TreeNode *t, char *path) {
     if(*path == '/')
         path++;
 
@@ -82,7 +82,7 @@ TreeNode *lookup_node(TreeNode *t, char *path) {
 /* remove the given node from the tree (remove it from its parent) but do not
  * free it
  */
-void remove_node(TreeNode *t) {
+void remove_treenode(TreeNode *t) {
     assert(t->parent);/* if t doesn't have a parent we can't remove it */
 
     /* locate this child */
@@ -110,10 +110,10 @@ void remove_node(TreeNode *t) {
  * path is modified (by lookup_node) but is restored to its original state
  */
 TreeNode *remove_path(TreeNode *t, char *path) {
-    TreeNode *node = lookup_node(t, path);
+    TreeNode *node = lookup_treenode(t, path);
 
     if(node)
-        remove_node(node);
+        remove_treenode(node);
 
     return node;
 }
@@ -122,7 +122,7 @@ TreeNode *remove_path(TreeNode *t, char *path) {
  * prepending the name for the parent node) and return it
  * you must free the returned pointer
  */
-char *node_name(TreeNode *t) {
+char *treenode_name(TreeNode *t) {
     if(!t->parent)
         return strdup("/");
 
@@ -142,11 +142,9 @@ char *node_name(TreeNode *t) {
     return path;
 }
 
-/* return the TreeNode for the given wd by looking it up in node_wd_hash */
-TreeNode *node_for_wd(int wd) {
-    DirInfo *d;
-
-    HASH_FIND_INT(wd_hash, &wd, d);
+/* return the TreeNode for the given wd */
+TreeNode *treenode_for_wd(int wd) {
+    DirInfo *d = dirinfo_for_wd(wd);
 
     if(d)
         return d->t;
@@ -155,7 +153,7 @@ TreeNode *node_for_wd(int wd) {
 }
 
 /* free the given node (and all of its children, via free_dirinfo) */
-void free_node(TreeNode *t) {
+void free_treenode(TreeNode *t) {
     if(!t)
         return;
 

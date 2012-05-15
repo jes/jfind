@@ -40,9 +40,14 @@ typedef struct NodeMove {
 /* treenode.c */
 TreeNode *new_treenode(const char *name);
 void add_child(TreeNode *t, TreeNode *child);
-TreeNode *lookup_node(TreeNode *t, char *path);
-void remove_node(TreeNode *t);
+TreeNode *lookup_treenode(TreeNode *t, char *path);
+void remove_treenode(TreeNode *t);
 TreeNode *remove_path(TreeNode *t, char *path);
-char *node_name(TreeNode *t);
-TreeNode *node_for_wd(int wd);
-void free_node(TreeNode *t);
+char *treenode_name(TreeNode *t);
+TreeNode *treenode_for_wd(int wd);
+void free_treenode(TreeNode *t);
+
+/* dirnode.c */
+DirInfo *new_dirinfo(TreeNode *t);
+DirInfo *dirinfo_for_wd(int wd);
+void free_dirinfo(DirInfo *d);
