@@ -3,8 +3,8 @@
 
 CFLAGS=-g -Wall
 LDFLAGS=
-jfindd_OBJS=src/jfindd/jfindd.o src/jfindd/treenode.o src/jfindd/dirinfo.o \
-			src/jfindd/index.o src/jfindd/inotify.o
+jfindd_OBJS=src/daemon/jfindd.o src/daemon/treenode.o src/daemon/dirinfo.o \
+			src/daemon/index.o src/daemon/inotify.o
 
 all: jfindd
 
