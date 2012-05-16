@@ -108,6 +108,9 @@ void handle_inotify_events(TreeNode *root) {
             exit(1);
         }
     }
+
+    /* reindex anything that has indexed=0 */
+    reindex(root, root);
 }
 
 /* handle an IN_CREATE event */
@@ -127,34 +130,45 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
     if((dir = isdir(newname)) == -1)
         return;
 
-    new->indexed = 1;
-
-    if(dir) {
-        new->dir = new_dirinfo(new);
-        indexfrom(root, newname);
-    }
+    /* no further work necessary if it is not a directory */
+    if(!dir)
+        new->indexed = 1;
 }
 
 /* handle an IN_DELETE event */
 void _inotify_delete(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
-    TreeNode *node = remove_path(parent, ev->name);
+    TreeNode *t = remove_path(parent, ev->name);
 
-    assert(node);/* there should always be a node with the name */
+    assert(t);/* there should always be a node with the name */
 
-    free_treenode(node);
+    free_treenode(t);
 }
 
 /* handle an IN_MOVED_FROM event */
 void _inotify_moved_from(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
-    fprintf(stderr, "error: IN_MOVED_FROM!\n");
-    exit(1);
+    TreeNode *t = lookup_treenode(parent, ev->name);
+
+    assert(t);/* there should always be a node with the name */
+
+    set_node_moved_from(ev->cookie, t);
 }
 
 /* handle an IN_MOVED_TO event */
 void _inotify_moved_to(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
-    fprintf(stderr, "error: IN_MOVED_TO!\n");
-    exit(1);
+    TreeNode *t = node_for_cookie(ev->cookie);
+
+    assert(t);/* there should always be a node for the cookie */
+
+    /* remove the node from its old place in the tree */
+    remove_treenode(t);
+
+    /* fix the filename */
+    free(t->name);
+    t->name = strdup(ev->name);
+
+    /* insert the node under its new parent */
+    add_child(parent, t);
 }

@@ -164,6 +164,9 @@ void remove_treenode(TreeNode *t) {
     t->parent->dir->nchilds--;
     t->parent->dir->child = realloc(t->parent->dir->child,
             t->parent->dir->nchilds * sizeof(TreeNode*));
+
+    /* t no longer has a parent */
+    t->parent = NULL;
 }
 
 /* remove the node described by the given path from the tree described by t,

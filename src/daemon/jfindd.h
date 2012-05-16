@@ -70,6 +70,7 @@ void free_dirinfo(DirInfo *d);
 typedef int (*TraversalFunc)(const char *);
 
 int isdir(const char *path);
+void reindex(TreeNode *node, TreeNode *root);
 int indexfrom(TreeNode *root, const char *relpath);
 int traverse(TreeNode *root, const char *path, TraversalFunc callback);
 
@@ -77,3 +78,8 @@ int traverse(TreeNode *root, const char *path, TraversalFunc callback);
 void init_inotify(void);
 void watch_directory(TreeNode *t, const char *path);
 void handle_inotify_events(TreeNode *root);
+
+/* nodemove.c */
+NodeMove *new_nodemove(void);
+void set_node_moved_from(int cookie, TreeNode *t);
+TreeNode *node_for_cookie(int cookie);

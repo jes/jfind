@@ -22,8 +22,25 @@ int isdir(const char *path) {
     return S_ISDIR(buf.st_mode) && !S_ISLNK(buf.st_mode);
 }
 
+/* reindex anything in the tree that has indexed=0 */
+void reindex(TreeNode *node, TreeNode *root) {
+    /* if this node isn't indexed, find out its name and index it, otherwise
+     * recurse on its children
+     */
+    if(!node->indexed) {
+        char *name = treenode_name(node);
+        printf("%s is not indexed!\n", name);
+        indexfrom(root, name);
+        free(name);
+    } else if(node->dir) {
+        int i;
+        for(i = 0; i < node->dir->nchilds; i++)
+            reindex(node->dir->child[i], root);
+    }
+}
+
 /* index the filesystem starting from the given path; print something to stderr
- * and return -1 if there are
+ * and return -1 if there are errors
  */
 int indexfrom(TreeNode *root, const char *relpath) {
     char path[PATH_MAX];
@@ -43,6 +60,13 @@ int indexfrom(TreeNode *root, const char *relpath) {
                 path);
         return -1;
     }
+
+    /* mark everything above the node as indexed so that it doesn't get
+     * indexed later
+     */
+    TreeNode *node;
+    for(node = t->parent; node; node = node->parent)
+        node->indexed = 1;
 
     /* if the path is a directory, make it so and index under it */
     int dir;
@@ -115,8 +139,13 @@ static void _indexfs(TreeNode *root, char *path) {
         } else if(dir) {
             child->dir = new_dirinfo(child);
             _indexfs(child, path);
+        } else {
+            /* non-directories need no further work */
+            child->indexed = 1;
         }
     }
+
+    root->indexed = 1;
 
     closedir(dp);
 
