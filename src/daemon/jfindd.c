@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
     /* set up a search interface */
     printf("? "); fflush(stdout);
     /* TODO: do this over unix domain sockets */
+    /* TODO: poll() instead of interleaving searching and indexing */
     char buf[1024];
     while(fgets(buf, 1024, stdin)) {
         search_term = buf;
@@ -105,6 +106,10 @@ int main(int argc, char **argv) {
         gettimeofday(&stop, NULL);
         printf("Search took %.3fms.\n\n",
                 difftimeofday(&start, &stop) * 1000.0);
+
+        printf("Doing inotify events...\n");
+        handle_inotify_events();
+        printf("\n");
 
         printf("? "); fflush(stdout);
     }

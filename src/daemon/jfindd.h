@@ -56,6 +56,7 @@ TreeNode *lookup_treenode(TreeNode *t, char *path);
 void remove_treenode(TreeNode *t);
 TreeNode *remove_path(TreeNode *t, char *path);
 char *treenode_name(TreeNode *t);
+void set_treenode_for_wd(int wd, TreeNode *t);
 TreeNode *treenode_for_wd(int wd);
 void free_treenode(TreeNode *t);
 
@@ -75,3 +76,4 @@ int traverse(TreeNode *root, const char *path, TraversalFunc callback);
 /* inotify.c */
 void init_inotify(void);
 void watch_directory(TreeNode *t, const char *path);
+void handle_inotify_events(TreeNode *root);

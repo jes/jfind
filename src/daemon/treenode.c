@@ -198,6 +198,7 @@ char *treenode_name(TreeNode *t) {
         sprintf(newpath, "/%s%s", t->name, path);
         free(path);
         path = newpath;
+        t = t->parent;
     }
 
     return path;
