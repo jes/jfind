@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     char buf[1024];
     while(fgets(buf, 1024, stdin)) {
         search_term = buf;
-        if(buf[strlen(buf)-1] == '\n')
+        if(*buf && buf[strlen(buf)-1] == '\n')
             buf[strlen(buf)-1] = '\0';
 
         gettimeofday(&start, NULL);

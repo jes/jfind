@@ -78,7 +78,7 @@ int indexfrom(TreeNode *root, const char *relpath) {
         /* remove a trailing slash if there is one (note: "/" -> "" but that's
          * OK)
          */
-        if(path[strlen(path)-1] == '/')
+        if(*path && path[strlen(path)-1] == '/')
             path[strlen(path)-1] = '\0';
         _indexfs(t, path);
     }
@@ -174,7 +174,7 @@ int traverse(TreeNode *root, const char *path, TraversalFunc callback) {
     strcpy(newpath, path);
 
     /* remove a trailing slash if appropriate */
-    if(newpath[strlen(newpath)-1] == '/')
+    if(*newpath && newpath[strlen(newpath)-1] == '/')
         newpath[strlen(newpath)-1] = '\0';
 
     /* lookup the node and fail if there is no such node */
