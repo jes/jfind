@@ -30,6 +30,7 @@ static char *search_term;
 
 /* a callback for traverse() */
 /* TODO: if this is slow, build it into traverse() */
+/* TODO: regex search */
 static int search(const char *s) {
     if(strstr(s, search_term))
         printf("%s\n", s);
@@ -90,6 +91,9 @@ int main(int argc, char **argv) {
     gettimeofday(&stop, NULL);
 
     printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
+
+    /* handle inotify events and client requests */
+    run(root, "./socket");
 
     /* set up a search interface */
     printf("? "); fflush(stdout);

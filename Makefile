@@ -4,7 +4,8 @@
 CFLAGS=-g -Wall
 LDFLAGS=
 jfindd_OBJS=src/daemon/jfindd.o src/daemon/treenode.o src/daemon/dirinfo.o \
-			src/daemon/index.o src/daemon/inotify.o src/daemon/nodemove.o
+			src/daemon/index.o src/daemon/inotify.o src/daemon/nodemove.o \
+            src/daemon/socket.o
 
 all: jfindd
 
