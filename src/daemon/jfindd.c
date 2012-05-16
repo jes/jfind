@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
                 difftimeofday(&start, &stop) * 1000.0);
 
         printf("Doing inotify events...\n");
-        handle_inotify_events();
+        handle_inotify_events(root);
         printf("\n");
 
         printf("? "); fflush(stdout);

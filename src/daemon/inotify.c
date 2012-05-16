@@ -30,9 +30,9 @@ void _inotify_moved_to(TreeNode *root, TreeNode *parent,
  */
 static struct MaskFunc maskfunc[] = {
     { IN_CREATE,     _inotify_create },
-/*    { IN_DELETE,     _inotify_delete },
+    { IN_DELETE,     _inotify_delete },
     { IN_MOVED_FROM, _inotify_moved_from },
-    { IN_MOVED_TO,   _inotify_moved_to },*/
+    { IN_MOVED_TO,   _inotify_moved_to },
     { 0,         0 }
 };
 
@@ -87,9 +87,7 @@ void handle_inotify_events(TreeNode *root) {
          * already ignoring
          */
         if(!t) {
-            if(ev->mask != IN_IGNORED) {
-                fprintf(stderr, "warning: \n");
-            }
+            assert(ev->mask == IN_IGNORED);/* we can't handle unknown nodes */
             continue;
         }
 
@@ -135,4 +133,28 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
         new->dir = new_dirinfo(new);
         indexfrom(root, newname);
     }
+}
+
+/* handle an IN_DELETE event */
+void _inotify_delete(TreeNode *root, TreeNode *parent,
+        struct inotify_event *ev) {
+    TreeNode *node = remove_path(parent, ev->name);
+
+    assert(node);/* there should always be a node with the name */
+
+    free_treenode(node);
+}
+
+/* handle an IN_MOVED_FROM event */
+void _inotify_moved_from(TreeNode *root, TreeNode *parent,
+        struct inotify_event *ev) {
+    fprintf(stderr, "error: IN_MOVED_FROM!\n");
+    exit(1);
+}
+
+/* handle an IN_MOVED_TO event */
+void _inotify_moved_to(TreeNode *root, TreeNode *parent,
+        struct inotify_event *ev) {
+    fprintf(stderr, "error: IN_MOVED_TO!\n");
+    exit(1);
 }
