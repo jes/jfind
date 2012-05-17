@@ -4,9 +4,11 @@
  */
 
 #include <sys/inotify.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -16,6 +18,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
+#include <poll.h>
 
 #include "uthash.h"
 
@@ -48,6 +51,15 @@ typedef struct NodeMove  {
     UT_hash_handle hh;/* for the hash table mapping cookie to NodeMove */
 } NodeMove;
 
+/* buffer for data from a client */
+typedef struct ClientBuffer {
+    int fd;
+    char *buf;
+    int nbytes;
+    int nallocd;
+    UT_hash_handle hh;/* for the hash table mapping fd to ClientBuffer */
+} ClientBuffer;
+
 /* treenode.c */
 TreeNode *new_treenode(const char *name);
 void add_child(TreeNode *t, TreeNode *child);
@@ -75,6 +87,8 @@ int indexfrom(TreeNode *root, const char *relpath);
 int traverse(TreeNode *root, const char *path, TraversalFunc callback);
 
 /* inotify.c */
+extern int inotify_fd;
+
 void init_inotify(void);
 void watch_directory(TreeNode *t, const char *path);
 void handle_inotify_events(TreeNode *root);
@@ -83,3 +97,9 @@ void handle_inotify_events(TreeNode *root);
 NodeMove *new_nodemove(void);
 void set_node_moved_from(int cookie, TreeNode *t);
 TreeNode *node_for_cookie(int cookie);
+
+/* socket.c */
+void run(TreeNode *root, const char *sockpath);
+ClientBuffer *new_clientbuffer(int fd);
+void clear_clientbuffer(int fd);
+void handle_client_data(TreeNode *root, int fd);

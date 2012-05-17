@@ -7,7 +7,7 @@
 
 #define WATCH_MASK (IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO)
 
-static int ifd;
+int inotify_fd;
 
 /* structure for handler functions for inotify events */
 struct MaskFunc {
@@ -38,7 +38,7 @@ static struct MaskFunc maskfunc[] = {
 
 /* initialise inotify, printing a message and dying if there is a problem */
 void init_inotify(void) {
-    if((ifd = inotify_init()) == -1) {
+    if((inotify_fd = inotify_init()) == -1) {
         perror("inotify_init");
         exit(1);
     }
@@ -51,7 +51,7 @@ void watch_directory(TreeNode *t, const char *path) {
     assert(t->dir);/* the node must be a directory */
 
     /* add the watch, and store it in the hash table if successful */
-    if((t->dir->wd = inotify_add_watch(ifd, path, WATCH_MASK)) == -1)
+    if((t->dir->wd = inotify_add_watch(inotify_fd, path, WATCH_MASK)) == -1)
         fprintf(stderr, "inotify_add_watch: %s: %s\n", path, strerror(errno));
     else
         set_treenode_for_wd(t->dir->wd, t);
@@ -65,7 +65,7 @@ void handle_inotify_events(TreeNode *root) {
 
     /* read from the inotify fd */
     int n;
-    if((n = read(ifd, buf, 1024)) <= 0) {
+    if((n = read(inotify_fd, buf, 1024)) <= 0) {
         if(n < 0)
             perror("inotify: read");
         else
