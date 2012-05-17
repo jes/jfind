@@ -50,15 +50,14 @@ int indexfrom(TreeNode *root, const char *relpath) {
 
     /* get an absolute path */
     if(!realpath(relpath, path)) {
-        fprintf(stderr, "error: realpath: %s\n", strerror(errno));
+        fprintf(stderr, "realpath: %s: %s\n", relpath, strerror(errno));
         return -1;
     }
 
     /* get a node describing this path */
     TreeNode *t;
     if(!(t = create_path(root, path))) {
-        fprintf(stderr, "error: adding %s to tree: Not a directory\n",
-                path);
+        fprintf(stderr, "create_path: %s: Not a directory\n", path);
         return -1;
     }
 

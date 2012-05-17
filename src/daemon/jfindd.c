@@ -40,10 +40,6 @@ int main(int argc, char **argv) {
     int c;
     while((c = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
         switch(c) {
-            case 0:
-                fprintf(stderr, "error: getopt_long() returned 0\n");
-                return 1;
-
             case 'h':
                 help();
                 return 0;
