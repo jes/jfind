@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <getopt.h>
 #include <string.h>
@@ -103,3 +104,6 @@ void run(TreeNode *root, const char *sockpath);
 ClientBuffer *new_clientbuffer(int fd);
 void clear_clientbuffer(int fd);
 int handle_client_data(TreeNode *root, int fd);
+
+/* string.c */
+char *strallocat(const char *s1, ...);

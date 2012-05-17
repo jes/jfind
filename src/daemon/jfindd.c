@@ -26,18 +26,6 @@ static void help(void) {
     );
 }
 
-static char *search_term;
-
-/* a callback for traverse() */
-/* TODO: if this is slow, build it into traverse() */
-/* TODO: regex search */
-static int search(const char *s) {
-    if(strstr(s, search_term))
-        printf("%s\n", s);
-
-    return 0;
-}
-
 /* return the difference in seconds between *start and *stop */
 static double difftimeofday(struct timeval *start, struct timeval *stop) {
     return (stop->tv_sec - start->tv_sec)

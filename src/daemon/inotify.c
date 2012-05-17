@@ -123,8 +123,7 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
     TreeNode *new = new_treenode(ev->name);
     add_child(parent, new);
 
-    char *newname = malloc(strlen(parentname) + strlen(ev->name) + 1);
-    sprintf(newname, "%s%s", parentname, ev->name);
+    char *newname = strallocat(parentname, ev->name, NULL);
 
     int dir;
     if((dir = isdir(newname)) == -1)

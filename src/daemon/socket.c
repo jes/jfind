@@ -167,6 +167,8 @@ static int search_fd;
 static char *search_term;
 
 /* callback for traverse() to give search results to clients */
+/* TODO: if this is slow, build it into traverse() */
+/* TODO: regex search */
 static int search(const char *path) {
     if(strstr(path, search_term)) {
         write(search_fd, path, strlen(path));

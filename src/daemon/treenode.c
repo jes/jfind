@@ -190,15 +190,13 @@ char *treenode_name(TreeNode *t) {
     if(!t->parent)
         return strdup("/");
 
-    char *path = malloc(strlen(t->name) + 3);
-    sprintf(path, "/%s%s", t->name, t->dir ? "/" : "");
+    char *path = strallocat("/", t->name, (t->dir ? "/" : ""), NULL);
 
     t = t->parent;
 
     /* repeatedly prepend the parent's name */
     while(t->parent) {
-        char *newpath = malloc(strlen(t->name) + strlen(path) + 2);
-        sprintf(newpath, "/%s%s", t->name, path);
+        char *newpath = strallocat("/", t->name, path, NULL);
         free(path);
         path = newpath;
         t = t->parent;
