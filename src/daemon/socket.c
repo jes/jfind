@@ -60,6 +60,7 @@ void run(TreeNode *root, const char *sockpath) {
 
         /* handle events */
         int i;
+        int ndeleted = 0;
         for(i = 0; i < nfds; i++) {
             /* die if there is a problem */
             /* TODO: handle this; when can it happen? */
@@ -94,20 +95,42 @@ void run(TreeNode *root, const char *sockpath) {
                     struct sockaddr_un remote;
                     socklen_t len = sizeof(struct sockaddr_un);
 
-                    fds[nfds].fd = accept(sockfd, (struct sockaddr *)&remote,
-                            &len);
-                    fds[nfds].events = POLLIN;
-                    fds[nfds].revents = 0;
-                    nfds++;
+                    int fd = accept(sockfd, (struct sockaddr *)&remote, &len);
+
+                    if(nfds == MAXPOLLFDS) {
+                        fprintf(stderr, "warning: had to disconnect a client "
+                                "because we already have %d open fds (try "
+                                "increasing MAXPOLLFDS in " __FILE__ ")\n",
+                                MAXPOLLFDS);
+                        /* TODO: write some error message to the socket */
+                        close(fd);
+                    } else {
+                        fds[nfds].fd = fd;
+                        fds[nfds].events = POLLIN;
+                        fds[nfds].revents = 0;
+                        nfds++;
+                    }
                 } else {
                     /* data from client */
-                    handle_client_data(root, fds[i].fd);
-                    fds[i].events = POLLIN;
+                    if(handle_client_data(root, fds[i].fd) == -1) {
+                        close(fds[i].fd);
+                        clear_clientbuffer(fds[i].fd);
+                        fds[i].fd = -1;
+                    }
                 }
             }
 
-            /* TODO: shuffle pollfds along to deal with deletions */
+            /* shuffle this pollfd along to overwrite deleted ones */
+            fds[i - ndeleted] = fds[i];
+
+            /* if this pollfd was deleted, shuffle future ones along by one
+             * extra place
+             */
+            if(fds[i].fd == -1)
+                ndeleted++;
         }
+
+        nfds -= ndeleted;
     }
 }
 
@@ -156,8 +179,9 @@ static int search(const char *path) {
 
 /* read and buffer data from a client, and when an endline is encountered do
  * the search
+ * return 0 on success and -1 if the client is disconnected
  */
-void handle_client_data(TreeNode *root, int fd) {
+int handle_client_data(TreeNode *root, int fd) {
     ClientBuffer *c;
 
     HASH_FIND_INT(fd_hash, &fd, c);
@@ -178,11 +202,9 @@ void handle_client_data(TreeNode *root, int fd) {
     int n;
     if((n = read(c->fd, c->buf + c->nbytes, c->nallocd - c->nbytes - 1))
             <= 0) {
-        /* we should hopefully get some notification from poll() if read() is
-         * going to fail, so for now we just die here
-         */
-        perror("read");
-        exit(1);
+        if(n < 0)
+            perror("read");
+        return -1;
     }
 
     c->nbytes += n;
@@ -197,8 +219,6 @@ void handle_client_data(TreeNode *root, int fd) {
         search_fd = c->fd;
         search_term = c->buf;
 
-        printf("Search term = %s\n", search_term);
-
         /* do the search */
         /* TODO: timing */
         traverse(root, "/", search);
@@ -211,4 +231,6 @@ void handle_client_data(TreeNode *root, int fd) {
         memmove(c->buf, end+1, c->nbytes + c->buf - end + 1);
         c->nbytes -= end - c->buf + 1;
     }
+
+    return 0;
 }

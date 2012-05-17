@@ -102,4 +102,4 @@ TreeNode *node_for_cookie(int cookie);
 void run(TreeNode *root, const char *sockpath);
 ClientBuffer *new_clientbuffer(int fd);
 void clear_clientbuffer(int fd);
-void handle_client_data(TreeNode *root, int fd);
+int handle_client_data(TreeNode *root, int fd);

@@ -29,7 +29,6 @@ void reindex(TreeNode *node, TreeNode *root) {
      */
     if(!node->indexed) {
         char *name = treenode_name(node);
-        printf("%s is not indexed!\n", name);
         indexfrom(root, name);
         free(name);
     } else if(node->dir) {
