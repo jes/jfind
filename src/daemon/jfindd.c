@@ -95,30 +95,5 @@ int main(int argc, char **argv) {
     /* handle inotify events and client requests */
     run(root, "./socket");
 
-    /* set up a search interface */
-    printf("? "); fflush(stdout);
-    /* TODO: do this over unix domain sockets */
-    /* TODO: poll() instead of interleaving searching and indexing */
-    char buf[1024];
-    while(fgets(buf, 1024, stdin)) {
-        search_term = buf;
-        if(*buf && buf[strlen(buf)-1] == '\n')
-            buf[strlen(buf)-1] = '\0';
-
-        gettimeofday(&start, NULL);
-        traverse(root, "/", search);
-        gettimeofday(&stop, NULL);
-        printf("Search took %.3fms.\n\n",
-                difftimeofday(&start, &stop) * 1000.0);
-
-        printf("Doing inotify events...\n");
-        handle_inotify_events(root);
-        printf("\n");
-
-        printf("? "); fflush(stdout);
-    }
-
-    free_treenode(root);
-
     return 0;
 }
