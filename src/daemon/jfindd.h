@@ -36,7 +36,8 @@ typedef struct DirInfo {
 
 /* store information for an arbitrary node in the fs tree */
 typedef struct TreeNode {
-    char indexed;/* 0 if this node needs indexing and 1 otherwise */
+    char indexed;/* 1 if this node is indexed, else 0 */
+    char complained;/* 1 if this node has had an error printed, else 0 */
     struct TreeNode *parent;/* the parent node (should be a directory) */
     char *name;
     DirInfo *dir;/* directory information for non-file nodes */
@@ -82,7 +83,7 @@ void free_dirinfo(DirInfo *d);
 /* index.c */
 typedef int (*TraversalFunc)(const char *);
 
-int isdir(const char *path);
+int isdir(const char *path, int printerror);
 void reindex(TreeNode *node, TreeNode *root);
 int indexfrom(TreeNode *root, const char *relpath);
 int traverse(TreeNode *root, const char *path, TraversalFunc callback);

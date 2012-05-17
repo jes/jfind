@@ -126,8 +126,10 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
     char *newname = strallocat(parentname, ev->name, NULL);
 
     int dir;
-    if((dir = isdir(newname)) == -1)
+    if((dir = isdir(newname, !new->complained)) == -1) {
+        new->complained = 1;
         return;
+    }
 
     /* no further work necessary if it is not a directory */
     if(!dir)
