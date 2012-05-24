@@ -70,9 +70,10 @@ void run(TreeNode *root, const char *sockpath) {
                 exit(1);
             }
 
-            /* stream closed */
             if(fds[i].revents & POLLHUP) {
-                /* die if the inotify or listening socket fd are closed */
+                /* stream closed
+                 * die if the inotify or listening socket fd are closed
+                 */
                 if(i < 2) {
                     fprintf(stderr, "error: pollfd %d (%s) closed (.fd=%d)\n",
                             i, (i == 0 ? "inotify" : "socket"), fds[i].fd);
@@ -83,10 +84,10 @@ void run(TreeNode *root, const char *sockpath) {
                 close(fds[i].fd);
                 clear_clientbuffer(fds[i].fd);
                 fds[i].fd = -1;
-            }
-
-            /* data available */
-            if(fds[i].revents & POLLIN) {
+            } else if(fds[i].revents & POLLIN) {
+                /* data available
+                 * handle the fd in an appropriate manner
+                 */
                 if(i == 0) {
                     /* inotify events */
                     handle_inotify_events(root);
