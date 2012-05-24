@@ -50,7 +50,19 @@ int indexfrom(TreeNode *root, const char *relpath) {
 
     /* get an absolute path */
     if(!realpath(relpath, path)) {
-        fprintf(stderr, "realpath: %s: %s\n", relpath, strerror(errno));
+        /* print a warning message if this path happens to exist in the tree
+         * and has not already been complained about;
+         * even though realpath failed, the path can already be in the tree
+         * when we are reindexing a node which has indexed=0
+         * a copy of relpath must be taken because it is declared const
+         */
+        char *p = strdup(relpath);
+        TreeNode *t = lookup_treenode(root, p);
+        free(p);
+        if(!t || !t->complained) {
+            fprintf(stderr, "realpath: %s: %s\n", relpath, strerror(errno));
+            t->complained = 1;
+        }
         return -1;
     }
 
