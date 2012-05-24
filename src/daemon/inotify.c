@@ -177,6 +177,9 @@ void _inotify_moved_to(TreeNode *root, TreeNode *parent,
     /* remove the node from its old place in the tree */
     remove_treenode(t);
 
+    /* remove a node with the same name if there is one there already */
+    free_treenode(remove_path(parent, ev->name));
+
     /* fix the filename */
     free(t->name);
     t->name = strdup(ev->name);
