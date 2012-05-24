@@ -92,9 +92,17 @@ int indexfrom(TreeNode *root, const char *relpath) {
  * least PATH_MAX bytes of storage
  */
 static void _indexfs(TreeNode *root, char *path) {
+    static int procwarned = 0;
     char *endpath = path + strlen(path);
 
     assert(root->dir);/* can't index under a non-directory */
+
+    /* inotify doesn't work on /proc, but index it anyway */
+    if(!procwarned && strncmp(path, "/proc", 5) == 0) {
+        procwarned = 1;
+        fprintf(stderr, "warning: inotify watchers don't work under "
+                "/proc; indexing anyway but it will become stale\n");
+    }
 
     /* ensure the path is not too long */
     if(strlen(path) >= PATH_MAX-1) {

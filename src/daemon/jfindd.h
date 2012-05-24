@@ -78,6 +78,7 @@ void free_treenode(TreeNode *t);
 DirInfo *new_dirinfo(TreeNode *t);
 void set_dirinfo_for_wd(int wd, DirInfo *d);
 DirInfo *dirinfo_for_wd(int wd);
+void remove_wd(int wd);
 void free_dirinfo(DirInfo *d);
 
 /* index.c */

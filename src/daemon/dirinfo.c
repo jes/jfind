@@ -34,6 +34,14 @@ DirInfo *dirinfo_for_wd(int wd) {
     return d;
 }
 
+/* remove the given wd from the hash */
+void remove_wd(int wd) {
+    DirInfo *d = dirinfo_for_wd(wd);
+
+    if(d)
+        HASH_DEL(wd_hash, d);
+}
+
 /* free the given DirInfo (and all of the child TreeNodes) */
 void free_dirinfo(DirInfo *d) {
     if(!d)

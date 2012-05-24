@@ -24,6 +24,8 @@ void _inotify_moved_from(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev);
 void _inotify_moved_to(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev);
+void _inotify_ignored(TreeNode *root, TreeNode *parent,
+        struct inotify_event *ev);
 
 /* handler functions for each type of inotify event; masks can be ORd together
  * to call a function only when the mask matches
@@ -33,6 +35,7 @@ static struct MaskFunc maskfunc[] = {
     { IN_DELETE,     _inotify_delete },
     { IN_MOVED_FROM, _inotify_moved_from },
     { IN_MOVED_TO,   _inotify_moved_to },
+    { IN_IGNORED,    _inotify_ignored },
     { 0,         0 }
 };
 
@@ -109,6 +112,8 @@ void handle_inotify_events(TreeNode *root) {
         }
     }
 
+    assert(p == n);/* we should use up *exactly* n bytes, no more */
+
     /* reindex anything that has indexed=0 */
     reindex(root, root);
 }
@@ -172,4 +177,13 @@ void _inotify_moved_to(TreeNode *root, TreeNode *parent,
 
     /* insert the node under its new parent */
     add_child(parent, t);
+}
+
+/* handle an IN_IGNORED event */
+void _inotify_ignored(TreeNode *root, TreeNode *parent,
+        struct inotify_event *ev) {
+    fprintf(stderr, "warning: told to ignore wd %d\n", ev->wd);
+
+    if(ev->wd != -1)
+        remove_wd(ev->wd);
 }
