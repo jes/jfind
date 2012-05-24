@@ -5,11 +5,14 @@
 
 #include "jfindd.h"
 
+int debug_mode = 0;
+
 static TreeNode *root;
 
 static struct option opts[] = {
-    { "help", no_argument, 0, 'h' },
-    { 0,      0,           0,  0  }
+    { "debug", no_argument, 0, 'd' },
+    { "help",  no_argument, 0, 'h' },
+    { 0,       0,           0,  0  }
 };
 
 /* --help output */
@@ -20,7 +23,8 @@ static void help(void) {
     "'Paths...' is a list of paths to index.\n"
     "\n"
     "Options:\n"
-    "  -h, --help  Display this help\n"
+    "  -d, --debug  Output debugging information\n"
+    "  -h, --help   Display this help\n"
     "\n"
     "Report bugs to James Stanley <james@incoherency.co.uk>\n"
     );
@@ -38,8 +42,12 @@ int main(int argc, char **argv) {
     /* parse options */
     opterr = 0;
     int c;
-    while((c = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
+    while((c = getopt_long(argc, argv, "dh", opts, NULL)) != -1) {
         switch(c) {
+            case 'd':
+                debug_mode = 1;
+                break;
+
             case 'h':
                 help();
                 return 0;

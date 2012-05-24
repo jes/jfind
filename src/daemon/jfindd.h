@@ -62,6 +62,9 @@ typedef struct ClientBuffer {
     UT_hash_handle hh;/* for the hash table mapping fd to ClientBuffer */
 } ClientBuffer;
 
+/* jfindd.c */
+extern int debug_mode;
+
 /* treenode.c */
 TreeNode *new_treenode(const char *name);
 void add_child(TreeNode *t, TreeNode *child);
