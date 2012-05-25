@@ -6,13 +6,15 @@
 #include "jfindd.h"
 
 int debug_mode = 0;
+const char *socket_path = SOCKET_PATH;
 
 static TreeNode *root;
 
 static struct option opts[] = {
-    { "debug", no_argument, 0, 'd' },
-    { "help",  no_argument, 0, 'h' },
-    { 0,       0,           0,  0  }
+    { "debug",  no_argument,       0, 'd' },
+    { "help",   no_argument,       0, 'h' },
+    { "socket", required_argument, 0, 's' },
+    { 0,        0,                 0,  0  }
 };
 
 /* --help output */
@@ -42,7 +44,7 @@ int main(int argc, char **argv) {
     /* parse options */
     opterr = 0;
     int c;
-    while((c = getopt_long(argc, argv, "dh", opts, NULL)) != -1) {
+    while((c = getopt_long(argc, argv, "dhs:", opts, NULL)) != -1) {
         switch(c) {
             case 'd':
                 debug_mode = 1;
@@ -51,6 +53,10 @@ int main(int argc, char **argv) {
             case 'h':
                 help();
                 return 0;
+
+            case 's':
+                socket_path = optarg;
+                break;
 
             case '?':
                 fprintf(stderr, "error: unknown option '%c'\n", optopt);
@@ -85,7 +91,7 @@ int main(int argc, char **argv) {
     printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
 
     /* handle inotify events and client requests */
-    run(root, "./socket");
+    run(root, socket_path);
 
     return 0;
 }

@@ -22,6 +22,7 @@
 #include <poll.h>
 
 #include "uthash.h"
+#include "../config.h"
 
 /* store information for a directory
  * this is a separate structure to TreeNode in the interest of saving memory
@@ -64,6 +65,7 @@ typedef struct ClientBuffer {
 
 /* jfindd.c */
 extern int debug_mode;
+extern const char *socket_path;
 
 /* treenode.c */
 TreeNode *new_treenode(const char *name);

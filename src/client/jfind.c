@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include "../config.h"
+
 int main(int argc, char **argv) {
     if(argc != 2) {
         fprintf(stderr, "usage: jfind search-term\n");
@@ -25,7 +27,7 @@ int main(int argc, char **argv) {
 
     struct sockaddr_un remote;
     remote.sun_family = AF_UNIX;
-    strcpy(remote.sun_path, "./socket");
+    strcpy(remote.sun_path, SOCKET_PATH);
     size_t len = strlen(remote.sun_path) + sizeof(remote.sun_family);
 
     if(connect(fd, (struct sockaddr *)&remote, len) == -1) {
