@@ -51,6 +51,9 @@ void run(TreeNode *root, const char *sockpath) {
     fds[1].events = POLLIN;
     nfds = 2;
 
+    /* don't die when a client disconnects prematurely */
+    signal(SIGPIPE, SIG_IGN);
+
     while(1) {
         /* wait for input on any of the fds */
         if(poll(fds, nfds, -1) == -1) {
@@ -172,9 +175,17 @@ static char *search_term;
 /* TODO: regex search */
 static int search(const char *path) {
     if(strstr(path, search_term)) {
-        write(search_fd, path, strlen(path));
+        int n;
+
+        while((n = write(search_fd, path, strlen(path))) == -1 && n == EAGAIN);
+        if(n == -1)
+            return n;
+
         char nl = '\n';
-        write(search_fd, &nl, 1);
+
+        while((n = write(search_fd, &nl, 1)) == -1 && n == EAGAIN);
+        if(n == -1)
+            return n;
     }
 
     return 0;
