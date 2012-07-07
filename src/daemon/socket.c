@@ -177,13 +177,15 @@ static int search(const char *path) {
     if(strstr(path, search_term)) {
         int n;
 
-        while((n = write(search_fd, path, strlen(path))) == -1 && n == EAGAIN);
+        while((n = write(search_fd, path, strlen(path))) == -1
+                && (errno == EAGAIN || errno == EINTR));
         if(n == -1)
             return n;
 
         char nl = '\n';
 
-        while((n = write(search_fd, &nl, 1)) == -1 && n == EAGAIN);
+        while((n = write(search_fd, &nl, 1)) == -1
+                && (errno == EAGAIN || errno == EINTR));
         if(n == -1)
             return n;
     }
