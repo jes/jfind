@@ -87,15 +87,15 @@ int handle_inotify_events(TreeNode *root) {
         ev = (struct inotify_event*)(buf + p);
         p += ev->len + sizeof(struct inotify_event);
 
+        /* output the event if in debug mode */
+        if(debug_mode)
+            _print_inotify_event(ev);
+
         /* report failure if the inotify event queue overflowed */
         if(ev->mask & IN_Q_OVERFLOW) {
             fprintf(stderr, "warning: inotify event queue overflow\n");
             return -1;
         }
-
-        /* output the event if in debug mode */
-        if(debug_mode)
-            _print_inotify_event(ev);
 
         /* lookup the node this wd describes */
         TreeNode *t = treenode_for_wd(ev->wd);
