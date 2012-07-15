@@ -108,7 +108,8 @@ int main(int argc, char **argv) {
         optind = init_optind;
         gettimeofday(&stop, NULL);
 
-        printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
+        fprintf(stderr, "Indexing took %.3fs.\n",
+                difftimeofday(&start, &stop));
 
         /* handle inotify events and client requests */
         run(root, socket_path);
@@ -125,7 +126,7 @@ int main(int argc, char **argv) {
         free_treenode(root);
 
         /* and now loop again to reindex */
-        printf("Reindexing...\n");
+        fprintf(stderr, "Reindexing...\n");
     }
 
     return 0;
