@@ -5,7 +5,7 @@
 
 #include "jfindd.h"
 
-static void _indexfs(TreeNode *root, char *path);
+static void _indexfs(TreeNode *root, TreeNode *node, char *path);
 static int _traverse(TreeNode *t, char *path, TraversalFunc callback);
 
 /* return 1 if path is a directory, 0 if it is a non-directory and -1 if an
@@ -93,21 +93,22 @@ int indexfrom(TreeNode *root, const char *relpath) {
          */
         if(*path && path[strlen(path)-1] == '/')
             path[strlen(path)-1] = '\0';
-        _indexfs(t, path);
+        _indexfs(root, t, path);
     }
 
     return 0;
 }
 
-/* recursively index the filesystem starting from the given node and path;
+/* recursively index the filesystem rooted at root, starting from the given
+ * node and path;
  * path is modified but is restored to its original state, and should have at
  * least PATH_MAX bytes of storage
  */
-static void _indexfs(TreeNode *root, char *path) {
+static void _indexfs(TreeNode *root, TreeNode *node, char *path) {
     static int procwarned = 0;
     char *endpath = path + strlen(path);
 
-    assert(root->dir);/* can't index under a non-directory */
+    assert(node->dir);/* can't index under a non-directory */
 
     /* inotify doesn't work on /proc, but index it anyway */
     if(!procwarned && strncmp(path, "/proc", 5) == 0) {
@@ -125,14 +126,14 @@ static void _indexfs(TreeNode *root, char *path) {
 
     DIR *dp;
     if(!(dp = opendir(path))) {
-        if(!root->complained)
+        if(!node->complained)
             fprintf(stderr, "opendir: %s: %s\n", path, strerror(errno));
-        root->complained = 1;
+        node->complained = 1;
         return;
     }
 
     /* watch this path with inotify */
-    watch_directory(root, path);
+    watch_directory(node, path);
 
     /* loop over all of the entries in the directory */
     struct dirent *de;
@@ -153,7 +154,7 @@ static void _indexfs(TreeNode *root, char *path) {
 
         /* add a new node to the tree */
         TreeNode *child = new_treenode(de->d_name);
-        add_child(root, child);
+        add_child(node, child);
 
         /* if this node is a directory, recurse */
         int dir;
@@ -162,26 +163,19 @@ static void _indexfs(TreeNode *root, char *path) {
             continue;
         } else if(dir) {
             child->dir = new_dirinfo(child);
-            _indexfs(child, path);
+            _indexfs(root, child, path);
         } else {
             /* non-directories need no further work */
             child->indexed = 1;
         }
     }
 
-    root->indexed = 1;
+    node->indexed = 1;
 
     closedir(dp);
 
-    /* TODO: we should handle inotify events here, because:
-     * a.) indexing can take ages and it would be a shame for the queue to
-     *     overflow just because we didn't read from it
-     * b.) there is a race between watch_directory() and readdir() and we
-     *     should handle inotify events now but ignore any inconsistencies
-     *     (e.g. IN_DELETE for a file we don't know about) so that after
-     *     indexing is completed we can care about inconsistencies safe in the
-     *     knowledge that they are not caused by the race here
-     */
+    /* now handle inotify events to keep the queue from overflowing */
+    handle_inotify_events(root);
 
     *endpath = '\0';
 }

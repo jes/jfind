@@ -137,15 +137,24 @@ int handle_inotify_events(TreeNode *root) {
 /* handle an IN_CREATE event */
 void _inotify_create(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
-    assert(ev->mask & IN_CREATE);/* has to be IN_CREATE */
-
-    char *parentname = treenode_name(parent);
+    /* don't do anything if we already know about this file (possibly it got
+     * created during the race window between adding the watcher and indexing
+     * the directory)
+     */
+    TreeNode *t = lookup_treenode(parent, ev->name);
+    if(t)
+        return;
 
     TreeNode *new = new_treenode(ev->name);
     add_child(parent, new);
 
+    char *parentname = treenode_name(parent);
     char *newname = strallocat(parentname, ev->name, NULL);
+    free(parentname);
 
+    /* find out if this new file is a directory, and mark it as complained if
+     * isdir() fails (and complains about it)
+     */
     int dir;
     if((dir = isdir(newname, !new->complained)) == -1) {
         new->complained = 1;
@@ -162,7 +171,12 @@ void _inotify_delete(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
     TreeNode *t = remove_path(parent, ev->name);
 
-    assert(t);/* there should always be a node with the name */
+    /* don't do anything if we didn't know about this file (possibly it got
+     * deleted during the race window between adding the watcher and indexing
+     * the directory)
+     */
+    if(!t)
+        return;
 
     free_treenode(t);
 }
@@ -172,7 +186,12 @@ void _inotify_moved_from(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
     TreeNode *t = lookup_treenode(parent, ev->name);
 
-    assert(t);/* there should always be a node with the name */
+    /* don't do anything if we didn't know about this file (possibly it got
+     * moved during the race window between adding the watcher and indexing the
+     * directory)
+     */
+    if(!t)
+        return;
 
     set_node_moved_from(ev->cookie, t);
 }
@@ -182,7 +201,13 @@ void _inotify_moved_to(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
     TreeNode *t = node_for_cookie(ev->cookie);
 
-    assert(t);/* there should always be a node for the cookie */
+    /* don't do anything if we didn't know about this cookie (possibly the move
+     * was during the race window between adding the watcher and indexing the
+     * directory, meaning _inotify_moved_from never set the treenode for this
+     * cookie)
+     */
+    if(!t)
+        return;
 
     /* remove the node from its old place in the tree */
     remove_treenode(t);
