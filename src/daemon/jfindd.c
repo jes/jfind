@@ -6,6 +6,7 @@
 #include "jfindd.h"
 
 int debug_mode = 0;
+int quiet_mode = 0;
 const char *socket_path = SOCKET_PATH;
 
 static TreeNode *root;
@@ -13,6 +14,7 @@ static TreeNode *root;
 static struct option opts[] = {
     { "debug",  no_argument,       0, 'd' },
     { "help",   no_argument,       0, 'h' },
+    { "quiet",  no_argument,       0, 'q' },
     { "socket", required_argument, 0, 's' },
     { 0,        0,                 0,  0  }
 };
@@ -25,8 +27,10 @@ static void help(void) {
     "'Paths...' is a list of paths to index.\n"
     "\n"
     "Options:\n"
-    "  -d, --debug  Output debugging information\n"
-    "  -h, --help   Display this help\n"
+    "  -d, --debug        Output debugging information\n"
+    "  -h, --help         Display this help\n"
+    "  -q, --quiet        Suppress a lot of error messages\n"
+    "  -s, --socket FILE  Set the path to the communication socket\n"
     "\n"
     "Report bugs to James Stanley <james@incoherency.co.uk>\n"
     );
@@ -42,7 +46,7 @@ int main(int argc, char **argv) {
     /* parse options */
     opterr = 0;
     int c;
-    while((c = getopt_long(argc, argv, "dhs:", opts, NULL)) != -1) {
+    while((c = getopt_long(argc, argv, "dhqs:", opts, NULL)) != -1) {
         switch(c) {
             case 'd':
                 debug_mode = 1;
@@ -51,6 +55,10 @@ int main(int argc, char **argv) {
             case 'h':
                 help();
                 return 0;
+
+            case 'q':
+                quiet_mode = 1;
+                break;
 
             case 's':
                 socket_path = optarg;

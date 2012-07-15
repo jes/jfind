@@ -16,7 +16,7 @@ int isdir(const char *path, int printerror) {
     struct stat buf;
 
     if(lstat(path, &buf) == -1) {
-        if(printerror)
+        if(printerror && !quiet_mode)
             fprintf(stderr, "stat: %s: %s\n", path, strerror(errno));
         return -1;
     }
@@ -59,7 +59,7 @@ int indexfrom(TreeNode *root, const char *relpath) {
         char *p = strdup(relpath);
         TreeNode *t = lookup_treenode(root, p);
         free(p);
-        if(!t || !t->complained) {
+        if((!t || !t->complained) && !quiet_mode) {
             fprintf(stderr, "realpath: %s: %s\n", relpath, strerror(errno));
             t->complained = 1;
         }

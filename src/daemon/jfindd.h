@@ -66,6 +66,7 @@ typedef struct ClientBuffer {
 
 /* jfindd.c */
 extern int debug_mode;
+extern int quiet_mode;
 extern const char *socket_path;
 
 /* treenode.c */
