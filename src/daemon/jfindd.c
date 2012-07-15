@@ -39,8 +39,6 @@ static double difftimeofday(struct timeval *start, struct timeval *stop) {
 }
 
 int main(int argc, char **argv) {
-    init_inotify();
-
     /* parse options */
     opterr = 0;
     int c;
@@ -76,22 +74,51 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    /* make the root node */
-    root = new_treenode("");
-    root->dir = new_dirinfo(root);
+    /* seconds to wait when something terrible happens and the filesystem needs
+     * to be reindexed; this is doubled every time it happens up until
+     * max_reindex_secs; the purpose of this is to prevent repeated reindexing
+     * followed by immediate failure and reindexing
+     */
+    int reindex_secs = 5;
+    int max_reindex_secs = 300;
 
-    struct timeval start, stop;
+    int init_optind = optind;
 
-    /* index all of the directories requested */
-    gettimeofday(&start, NULL);
-    while(optind < argc)
-        indexfrom(root, argv[optind++]);
-    gettimeofday(&stop, NULL);
+    while(1) {
+        init_inotify();
 
-    printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
+        /* make the root node */
+        root = new_treenode("");
+        root->dir = new_dirinfo(root);
 
-    /* handle inotify events and client requests */
-    run(root, socket_path);
+        struct timeval start, stop;
+
+        /* index all of the directories requested */
+        gettimeofday(&start, NULL);
+        while(optind < argc)
+            indexfrom(root, argv[optind++]);
+        optind = init_optind;
+        gettimeofday(&stop, NULL);
+
+        printf("Indexing took %.3fs.\n", difftimeofday(&start, &stop));
+
+        /* handle inotify events and client requests */
+        run(root, socket_path);
+        /* if run() returns, something terrible has happened */
+
+        /* sleep a while and then double the sleep period */
+        fprintf(stderr, "warning: sleeping %d secs\n", reindex_secs);
+        sleep(reindex_secs);
+        reindex_secs *= 2;
+        if(reindex_secs > max_reindex_secs)
+            reindex_secs = max_reindex_secs;
+
+        /* now clear all state */
+        free_treenode(root);
+
+        /* and now loop again to reindex */
+        printf("Reindexing...\n");
+    }
 
     return 0;
 }

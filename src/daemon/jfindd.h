@@ -100,7 +100,7 @@ extern int inotify_fd;
 
 void init_inotify(void);
 void watch_directory(TreeNode *t, const char *path);
-void handle_inotify_events(TreeNode *root);
+int handle_inotify_events(TreeNode *root);
 
 /* nodemove.c */
 NodeMove *new_nodemove(void);

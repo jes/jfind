@@ -61,8 +61,10 @@ void watch_directory(TreeNode *t, const char *path) {
         set_treenode_for_wd(t->dir->wd, t);
 }
 
-/* deal with any new inotify events */
-void handle_inotify_events(TreeNode *root) {
+/* deal with any new inotify events
+ * return 0 on success and -1 on failure
+ */
+int handle_inotify_events(TreeNode *root) {
 #define INOTIFY_BUFSZ 4096
     char buf[INOTIFY_BUFSZ];
 
@@ -84,6 +86,12 @@ void handle_inotify_events(TreeNode *root) {
     while(p < n) {
         ev = (struct inotify_event*)(buf + p);
         p += ev->len + sizeof(struct inotify_event);
+
+        /* report failure if the inotify event queue overflowed */
+        if(ev->mask & IN_Q_OVERFLOW) {
+            fprintf(stderr, "warning: inotify event queue overflow\n");
+            return -1;
+        }
 
         /* output the event if in debug mode */
         if(debug_mode)
@@ -122,6 +130,8 @@ void handle_inotify_events(TreeNode *root) {
 
     /* reindex anything that has indexed=0 */
     reindex(root, root);
+
+    return 0;
 }
 
 /* handle an IN_CREATE event */

@@ -11,6 +11,8 @@ static ClientBuffer *fd_hash;
  * giving search results to clients
  * NOTE: sockpath must fit in sockaddr_un.sun_path, so must be no more than 107
  * bytes long, plus a terminating nul byte
+ * if this function returns, it means something terrible happened and we must
+ * reindex the filesystem from the beginning
  */
 void run(TreeNode *root, const char *sockpath) {
     int sockfd;
@@ -58,7 +60,7 @@ void run(TreeNode *root, const char *sockpath) {
         /* wait for input on any of the fds */
         if(poll(fds, nfds, -1) == -1) {
             perror("poll");
-            break;
+            exit(1);
         }
 
         /* handle events */
@@ -93,7 +95,15 @@ void run(TreeNode *root, const char *sockpath) {
                  */
                 if(i == 0) {
                     /* inotify events */
-                    handle_inotify_events(root);
+                    if(handle_inotify_events(root) == -1) {
+                        /* something terrible happened; close all fds and
+                         * return so that the fs gets reindexed and we start
+                         * afresh
+                         */
+                        for(i = 0; i < nfds; i++)
+                            close(fds[i].fd);
+                        return;
+                    }
                 } else if(i == 1) {
                     /* connection from client */
                     struct sockaddr_un remote;
@@ -124,7 +134,9 @@ void run(TreeNode *root, const char *sockpath) {
                 }
             }
 
-            /* shuffle this pollfd along to overwrite deleted ones */
+            /* shuffle this pollfd along to overwrite deleted ones
+             * (note: no-op when ndeleted=0)
+             */
             fds[i - ndeleted] = fds[i];
 
             /* if this pollfd was deleted, shuffle future ones along by one
@@ -136,6 +148,9 @@ void run(TreeNode *root, const char *sockpath) {
 
         nfds -= ndeleted;
     }
+
+    fprintf(stderr, "error: execution left infinite loop!\n");
+    exit(1);
 }
 
 /* allocate and initialise a new ClientBuffer for the given fd */
