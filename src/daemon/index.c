@@ -173,9 +173,14 @@ static void _indexfs(TreeNode *root, char *path) {
 
     closedir(dp);
 
-    /* TODO: should we handle inotify events here? this can run for a very long
-     * time indeed and it would be a shame if the inotify queue became full
-     * just because we failed to act on new events
+    /* TODO: we should handle inotify events here, because:
+     * a.) indexing can take ages and it would be a shame for the queue to
+     *     overflow just because we didn't read from it
+     * b.) there is a race between watch_directory() and readdir() and we
+     *     should handle inotify events now but ignore any inconsistencies
+     *     (e.g. IN_DELETE for a file we don't know about) so that after
+     *     indexing is completed we can care about inconsistencies safe in the
+     *     knowledge that they are not caused by the race here
      */
 
     *endpath = '\0';
