@@ -68,7 +68,14 @@ int handle_inotify_events(TreeNode *root) {
 #define INOTIFY_BUFSZ 4096
     char buf[INOTIFY_BUFSZ];
 
-    /* TODO: poll with 0 timeout to check that there is actually data? */
+    /* poll with a 0 timeout just to see if there is anything to read */
+    struct pollfd fds = { inotify_fd, POLLIN };
+    if(poll(&fds, 1, 0) == -1) {
+        perror("poll");
+        exit(1);
+    }
+    if(!(fds.revents & POLLIN))
+        return 0;
 
     /* read from the inotify fd */
     int n;
@@ -158,8 +165,11 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
     int dir;
     if((dir = isdir(newname, !new->complained)) == -1) {
         new->complained = 1;
+        free(newname);
         return;
     }
+
+    free(newname);
 
     /* no further work necessary if it is not a directory */
     if(!dir)

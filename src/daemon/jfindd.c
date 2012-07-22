@@ -101,6 +101,8 @@ int main(int argc, char **argv) {
 
         struct timeval start, stop;
 
+        fprintf(stderr, "Indexing...\n");
+
         /* index all of the directories requested */
         gettimeofday(&start, NULL);
         while(optind < argc)
@@ -124,9 +126,6 @@ int main(int argc, char **argv) {
 
         /* now clear all state */
         free_treenode(root);
-
-        /* and now loop again to reindex */
-        fprintf(stderr, "Reindexing...\n");
     }
 
     return 0;
