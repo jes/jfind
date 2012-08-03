@@ -72,8 +72,7 @@ extern const char *socket_path;
 /* treenode.c */
 TreeNode *new_treenode(const char *name);
 void add_child(TreeNode *t, TreeNode *child);
-TreeNode *create_path(TreeNode *t, char *path);
-TreeNode *lookup_treenode(TreeNode *t, char *path);
+TreeNode *lookup_treenode(TreeNode *t, char *path, int create);
 void remove_treenode(TreeNode *t);
 TreeNode *remove_path(TreeNode *t, char *path);
 char *treenode_name(TreeNode *t);

@@ -57,7 +57,7 @@ int indexfrom(TreeNode *root, const char *relpath) {
          * a copy of relpath must be taken because it is declared const
          */
         char *p = strdup(relpath);
-        TreeNode *t = lookup_treenode(root, p);
+        TreeNode *t = lookup_treenode(root, p, 0);
         free(p);
         if((!t || !t->complained) && !quiet_mode) {
             fprintf(stderr, "realpath: %s: %s\n", relpath, strerror(errno));
@@ -68,8 +68,8 @@ int indexfrom(TreeNode *root, const char *relpath) {
 
     /* get a node describing this path */
     TreeNode *t;
-    if(!(t = create_path(root, path))) {
-        fprintf(stderr, "create_path: %s: Not a directory\n", path);
+    if(!(t = lookup_treenode(root, path, 1))) {
+        fprintf(stderr, "lookup_treenode: %s: Not a directory\n", path);
         return -1;
     }
 
@@ -201,7 +201,7 @@ int traverse(TreeNode *root, const char *path, TraversalFunc callback) {
         newpath[strlen(newpath)-1] = '\0';
 
     /* lookup the node and fail if there is no such node */
-    TreeNode *t = lookup_treenode(root, newpath);
+    TreeNode *t = lookup_treenode(root, newpath, 0);
     if(!t)
         return -1;
 

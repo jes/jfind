@@ -148,7 +148,7 @@ void _inotify_create(TreeNode *root, TreeNode *parent,
      * created during the race window between adding the watcher and indexing
      * the directory)
      */
-    TreeNode *t = lookup_treenode(parent, ev->name);
+    TreeNode *t = lookup_treenode(parent, ev->name, 0);
     if(t)
         return;
 
@@ -194,7 +194,7 @@ void _inotify_delete(TreeNode *root, TreeNode *parent,
 /* handle an IN_MOVED_FROM event */
 void _inotify_moved_from(TreeNode *root, TreeNode *parent,
         struct inotify_event *ev) {
-    TreeNode *t = lookup_treenode(parent, ev->name);
+    TreeNode *t = lookup_treenode(parent, ev->name, 0);
 
     /* don't do anything if we didn't know about this file (possibly it got
      * moved during the race window between adding the watcher and indexing the

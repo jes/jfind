@@ -35,11 +35,12 @@ void add_child(TreeNode *t, TreeNode *child) {
     child->parent = t;
 }
 
-/* create all of the directory nodes required for the given path and return the
- * resulting leaf node, or NULL if an existing node along the way is not a
- * directory
+/* lookup the given path, starting at the given node, and return the node
+ * described by the path or NULL if there is none (unless create is non-zero,
+ * in which case all required nodes are created instead)
+ * path is modified but will be restored to its original state
  */
-TreeNode *create_path(TreeNode *t, char *path) {
+TreeNode *lookup_treenode(TreeNode *t, char *path, int create) {
     if(*path == '/')
         path++;
 
@@ -58,83 +59,36 @@ TreeNode *create_path(TreeNode *t, char *path) {
         int i;
         for(i = 0; i < nchilds; i++) {
             if(strcmp(t->dir->child[i]->name, path) == 0) {
-                /* if there are more path components, restore *endpath and
-                 * move on, otherwise jump to the end of the path
-                 */
-                if(endpath) {
-                    *endpath = '/';
-                    path = endpath + 1;
-                } else {
-                    path += strlen(path);
-                }
-
                 /* move on to the child */
                 t = t->dir->child[i];
                 break;
             }
         }
 
-        /* no such child was found */
-        if(i == nchilds) {
+        if(i == nchilds) {/* no such child was found */
+            /* return NULL if we're not creating new nodes */
+            if(!create)
+                return NULL;
+
+            /* create the node */
             TreeNode *child = new_treenode(path);
             add_child(t, child);
 
-            if(endpath) {
-                *endpath = '/';
-                path = endpath + 1;
+            if(endpath)
                 child->dir = new_dirinfo(child);
-            } else {
-                path += strlen(path);
-            }
 
             t = child;
         }
-    }
 
-    return t;
-}
-
-/* lookup the given path, starting at the given node, and return the node
- * described by the path or NULL if there is none
- * path is modified but will be restored to its original state
- */
-TreeNode *lookup_treenode(TreeNode *t, char *path) {
-    if(*path == '/')
-        path++;
-
-    while(*path && strcmp(path, "/") != 0) {
-        if(!t->dir)/* the child node can't be found if not a directory */
-            return NULL;
-
-        /* mark the end of the next path component for strcmp's sake */
-        char *endpath = NULL;
-        if((endpath = strchr(path, '/')))
-            *endpath = '\0';
-
-        /* store nchilds because t gets updated to point at a different node */
-        int nchilds = t->dir->nchilds;
-
-        int i;
-        for(i = 0; i < nchilds; i++) {
-            if(strcmp(t->dir->child[i]->name, path) == 0) {
-                /* if there are more path components, restore *endpath and
-                 * move on, otherwise jump to the end of the path
-                 */
-                if(endpath) {
-                    *endpath = '/';
-                    path = endpath + 1;
-                } else {
-                    path += strlen(path);
-                }
-
-                /* move on to the child */
-                t = t->dir->child[i];
-                break;
-            }
+        /* if there are more path components, restore *endpath and
+         * move on, otherwise jump to the end of the path
+         */
+        if(endpath) {
+            *endpath = '/';
+            path = endpath + 1;
+        } else {
+            path += strlen(path);
         }
-
-        if(i == nchilds)/* no such child was found */
-            return NULL;
     }
 
     return t;
@@ -171,10 +125,10 @@ void remove_treenode(TreeNode *t) {
 
 /* remove the node described by the given path from the tree described by t,
  * and return it
- * path is modified (by lookup_node) but is restored to its original state
+ * path is modified (by lookup_treenode) but is restored to its original state
  */
 TreeNode *remove_path(TreeNode *t, char *path) {
-    TreeNode *node = lookup_treenode(t, path);
+    TreeNode *node = lookup_treenode(t, path, 0);
 
     if(node)
         remove_treenode(node);
