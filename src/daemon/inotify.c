@@ -55,10 +55,18 @@ void watch_directory(TreeNode *t, const char *path) {
     assert(t->dir);/* the node must be a directory */
 
     /* add the watch, and store it in the hash table if successful */
-    if((t->dir->wd = inotify_add_watch(inotify_fd, path, WATCH_MASK)) == -1)
+    if((t->dir->wd = inotify_add_watch(inotify_fd, path, WATCH_MASK)) == -1) {
         fprintf(stderr, "inotify_add_watch: %s: %s\n", path, strerror(errno));
-    else
+
+        /* give a helpful error message in the event of ENOSPC */
+        if(errno == ENOSPC) {
+            fprintf(stderr, "perhaps you need to increase "
+                            "/proc/sys/fs/inotify/max_user_watches\n");
+            exit(1);
+        }
+    } else {
         set_treenode_for_wd(t->dir->wd, t);
+    }
 }
 
 /* deal with any new inotify events
